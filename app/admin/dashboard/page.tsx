@@ -1,10 +1,8 @@
-import { ChartsSection } from "@/components/admin/ChartsSection";
 import {
   DashboardQuickActions,
   DashboardStats,
 } from "@/components/admin/DashboardStats";
 import { GuardianApprovalsTable } from "@/components/admin/GuardianApprovalsTable";
-import { RecentRoutesTable } from "@/components/admin/RecentRoutesTable";
 import { TransportActivityTimeline } from "@/components/admin/TransportActivityTimeline";
 
 function getFormattedDate() {
@@ -30,14 +28,9 @@ export default function AdminDashboardPage() {
 
       <DashboardStats />
 
-      <ChartsSection />
+      <GuardianApprovalsTable />
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <GuardianApprovalsTable />
-        <TransportActivityTimeline />
-      </div>
-
-      <RecentRoutesTable />
+      <TransportActivityTimeline />
 
       <DashboardQuickActions />
     </div>

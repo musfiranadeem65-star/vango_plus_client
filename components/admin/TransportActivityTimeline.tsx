@@ -4,7 +4,7 @@ import { TRANSPORT_ACTIVITY } from "@/lib/admin/constants";
 import { cn } from "@/lib/utils";
 
 const iconToneStyles = {
-  primary: "bg-primary-container text-white",
+  primary: "bg-primary-container text-on-primary-container",
   alert: "bg-secondary-container text-on-secondary-container",
   neutral: "bg-surface-container-highest text-on-surface-variant",
 };

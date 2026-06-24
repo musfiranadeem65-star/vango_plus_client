@@ -5,6 +5,7 @@
   --foreground: #191c1e;
   --primary: #005c9b;
   --primary-container: #2e75b6;
+  --on-primary-container: #f5f8ff;
   --primary-dark: #1b3a5c;
   --primary-fixed: #d1e4ff;
   --primary-fixed-dim: #9ecaff;
@@ -43,6 +44,7 @@
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
   --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
   --color-primary-dark: var(--primary-dark);
   --color-primary-fixed: var(--primary-fixed);
   --color-primary-fixed-dim: var(--primary-fixed-dim);

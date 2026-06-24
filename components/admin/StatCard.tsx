@@ -64,7 +64,7 @@ export function StatCard({
         </span>
       )}
       <Icon name={icon} className={styles.icon} size={22} />
-      <span className="mt-1 text-4xl font-bold leading-none tracking-tight">
+      <span className="mt-1 text-[48px] font-bold leading-none tracking-tight">
         {value}
       </span>
       <span className="font-[family-name:var(--font-inter)] text-xs font-semibold uppercase tracking-wider">

@@ -13,7 +13,7 @@ const variantStyles: Record<ButtonVariant, string> = {
   primary:
     "bg-primary text-white hover:bg-[#2563a0] focus-visible:ring-primary/40",
   secondary:
-    "bg-parent text-white hover:bg-[#0b7a70] focus-visible:ring-parent/40",
+    "bg-secondary text-white hover:bg-[#005850] focus-visible:ring-secondary/40",
   parent:
     "bg-parent text-white hover:bg-[#0b7a70] focus-visible:ring-parent/40",
   outline:
