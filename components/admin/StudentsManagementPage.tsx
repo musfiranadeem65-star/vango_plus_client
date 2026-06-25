@@ -5,7 +5,6 @@ import {
   Camera,
   ChevronDown,
   Eye,
-  Menu,
   PencilLine,
   Plus,
   Power,
@@ -98,18 +97,9 @@ export function StudentsManagementPage() {
         <section className="flex-1 overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50/70">
           <div className="flex flex-col gap-4 border-b border-slate-200 bg-white px-4 py-4 sm:px-6 sm:py-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
-                  aria-label="Toggle navigation"
-                >
-                  <Menu size={18} />
-                </button>
-                <div>
-                  <h1 className="text-2xl font-bold text-[#0f2c4b]">Students</h1>
-                  <p className="text-sm text-slate-500">Keep transport records tidy and up to date.</p>
-                </div>
+              <div>
+                <h1 className="text-2xl font-bold text-[#0f2c4b]">Students</h1>
+                <p className="text-sm text-slate-500">Keep transport records tidy and up to date.</p>
               </div>
 
               <button

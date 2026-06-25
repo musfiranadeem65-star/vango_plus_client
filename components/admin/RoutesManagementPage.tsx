@@ -2,15 +2,11 @@
 
 import { useMemo, useState } from "react";
 import {
-  Bell,
   ChevronDown,
   CirclePlus,
   GripVertical,
-  Home,
   MapPin,
-  Menu,
   Plus,
-  Save,
   Trash2,
   UserCircle2,
   Users,
@@ -64,27 +60,10 @@ export function RoutesManagementPage() {
   }, [selectedRoute]);
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl flex-col bg-[#F8FAFC] px-3 pb-24 pt-3 sm:px-4 sm:pt-4 lg:px-6 lg:pb-10">
+    <div className="mx-auto flex w-full max-w-6xl flex-col">
       <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_16px_50px_rgba(15,23,42,0.06)]">
         <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
-              aria-label="Open menu"
-            >
-              <Menu size={18} />
-            </button>
-            <div className="flex items-center gap-2 text-[#0B5394]">
-              <MapPin size={18} />
-              <h1 className="text-base font-bold sm:text-lg">VanGo Plus</h1>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0B5394] text-sm font-semibold text-white">
-              AM
-            </div>
-          </div>
-
-          <div className="mt-5 flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-2xl font-bold text-slate-900 sm:text-[28px]">Routes</h2>
               <p className="mt-1 text-sm text-slate-500">Manage school transportation loops</p>
@@ -184,29 +163,6 @@ export function RoutesManagementPage() {
           </button>
         </div>
       </div>
-
-      <nav className="fixed bottom-0 left-0 z-40 flex w-full items-center justify-around border-t border-slate-200 bg-white px-2 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.06)] sm:px-4 lg:hidden">
-        {[
-          { label: "Home", icon: Home },
-          { label: "Routes", icon: MapPin, active: true },
-          { label: "Alerts", icon: Bell },
-          { label: "Profile", icon: UserCircle2 },
-        ].map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.label}
-              type="button"
-              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-1 text-[11px] font-semibold ${
-                item.active ? "text-[#0B5394]" : "text-slate-500"
-              }`}
-            >
-              <Icon size={18} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
 
       <aside className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-6xl border-t border-slate-200 bg-white px-4 py-4 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] lg:static lg:mt-5 lg:max-w-none lg:rounded-[24px] lg:border lg:px-5 lg:py-5 lg:shadow-sm">
         <div className="flex items-start justify-between gap-3">
