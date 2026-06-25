@@ -1,5 +1,5 @@
-import { AdminPlaceholderPage } from "@/components/admin/AdminPlaceholderPage";
+import { RoutesManagementPage } from "@/components/admin/RoutesManagementPage";
 
 export default function RoutesPage() {
-  return <AdminPlaceholderPage title="Routes Management" />;
+  return <RoutesManagementPage />;
 }

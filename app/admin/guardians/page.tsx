@@ -1,5 +1,5 @@
-import { AdminPlaceholderPage } from "@/components/admin/AdminPlaceholderPage";
+import { GuardianApprovalsPage } from "@/components/admin/GuardianApprovalsPage";
 
 export default function GuardiansPage() {
-  return <AdminPlaceholderPage title="Guardian Approvals" />;
+  return <GuardianApprovalsPage />;
 }

@@ -1,5 +1,5 @@
-import { AdminPlaceholderPage } from "@/components/admin/AdminPlaceholderPage";
+import { SettingsManagementPage } from "@/components/admin/SettingsManagementPage";
 
 export default function SettingsPage() {
-  return <AdminPlaceholderPage title="Settings" />;
+  return <SettingsManagementPage />;
 }

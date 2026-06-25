@@ -1,5 +1,5 @@
-import { AdminPlaceholderPage } from "@/components/admin/AdminPlaceholderPage";
+import { SubscriptionsManagementPage } from "@/components/admin/SubscriptionsManagementPage";
 
 export default function SubscriptionsPage() {
-  return <AdminPlaceholderPage title="Subscriptions" />;
+  return <SubscriptionsManagementPage />;
 }

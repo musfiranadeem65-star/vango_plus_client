@@ -1,5 +1,5 @@
-import { AdminPlaceholderPage } from "@/components/admin/AdminPlaceholderPage";
+import { DriversManagementPage } from "@/components/admin/DriversManagementPage";
 
 export default function DriversPage() {
-  return <AdminPlaceholderPage title="Drivers Management" />;
+  return <DriversManagementPage />;
 }

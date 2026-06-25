@@ -1,5 +1,5 @@
-import { AdminPlaceholderPage } from "@/components/admin/AdminPlaceholderPage";
+import { StudentsManagementPage } from "@/components/admin/StudentsManagementPage";
 
 export default function StudentsPage() {
-  return <AdminPlaceholderPage title="Students" />;
+  return <StudentsManagementPage />;
 }

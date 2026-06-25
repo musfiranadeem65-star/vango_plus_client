@@ -1,5 +1,5 @@
-import { AdminPlaceholderPage } from "@/components/admin/AdminPlaceholderPage";
+import { AttendanceLogPage } from "@/components/admin/AttendanceLogPage";
 
 export default function AlertsPage() {
-  return <AdminPlaceholderPage title="Alerts" />;
+  return <AttendanceLogPage />;
 }
