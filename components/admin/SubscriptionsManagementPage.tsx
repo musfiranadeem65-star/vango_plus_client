@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import {
   ChevronRight,
-  MessageCircleMore,
   Search,
+  X,
 } from "lucide-react";
 
 interface SubscriptionRecord {
@@ -15,7 +15,7 @@ interface SubscriptionRecord {
   amount: string;
 }
 
-const subscriptions: SubscriptionRecord[] = [
+const seedSubscriptions: SubscriptionRecord[] = [
   {
     id: 1,
     parent: "Saira Khan",
@@ -46,12 +46,20 @@ const tabConfig = [
 ];
 
 export function SubscriptionsManagementPage() {
+  const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>(seedSubscriptions);
   const [activeTab, setActiveTab] = useState("All");
+  const [receiptRecord, setReceiptRecord] = useState<SubscriptionRecord | null>(null);
 
   const filteredSubscriptions = useMemo(() => {
     if (activeTab === "All") return subscriptions;
     return subscriptions.filter((item) => item.status === activeTab);
-  }, [activeTab]);
+  }, [subscriptions, activeTab]);
+
+  function markPaid(id: number) {
+    setSubscriptions((current) =>
+      current.map((item) => (item.id === id ? { ...item, status: "Paid" } : item))
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col">
@@ -125,28 +133,22 @@ export function SubscriptionsManagementPage() {
 
                     <div className="flex items-center gap-2">
                       {record.status === "Paid" ? (
-                        <button type="button" className="inline-flex items-center gap-1 text-sm font-semibold text-[#0F766E]">
+                        <button
+                          type="button"
+                          onClick={() => setReceiptRecord(record)}
+                          className="inline-flex items-center gap-1 text-sm font-semibold text-[#0F766E]"
+                        >
                           View Detail
                           <ChevronRight size={16} />
                         </button>
                       ) : (
-                        <>
-                          {record.status === "Pending" ? (
-                            <button
-                              type="button"
-                              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
-                              aria-label="Open chat"
-                            >
-                              <MessageCircleMore size={18} />
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="rounded-2xl bg-[#0B5394] px-3.5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
-                          >
-                            Mark Paid
-                          </button>
-                        </>
+                        <button
+                          type="button"
+                          onClick={() => markPaid(record.id)}
+                          className="rounded-2xl bg-[#0B5394] px-3.5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
+                        >
+                          Mark Paid
+                        </button>
                       )}
                     </div>
                   </div>
@@ -156,6 +158,70 @@ export function SubscriptionsManagementPage() {
           </div>
         </div>
       </div>
+
+      {receiptRecord ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setReceiptRecord(null)}
+            aria-hidden="true"
+          />
+          <div className="relative w-full max-w-sm">
+            <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-xl">
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-[#0B5394] px-5 py-4 text-white">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">Payment Receipt</p>
+                  <h3 className="mt-1 text-lg font-bold">VanGo Plus</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReceiptRecord(null)}
+                  className="rounded-full p-1.5 text-white/80 transition hover:bg-white/10"
+                  aria-label="Close receipt"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4 px-5 py-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Receipt No.</span>
+                  <span className="text-sm font-semibold text-slate-800">
+                    #VG-{String(receiptRecord.id).padStart(5, "0")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Parent</span>
+                  <span className="text-sm font-semibold text-slate-800">{receiptRecord.parent}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">{receiptRecord.student.split(":")[0]}</span>
+                  <span className="text-sm font-semibold text-slate-800">
+                    {receiptRecord.student.split(":")[1]?.trim() ?? receiptRecord.student}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Status</span>
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                    {receiptRecord.status}
+                  </span>
+                </div>
+
+                <div className="my-3 border-t border-dashed border-slate-200" />
+
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-semibold text-slate-700">Amount Paid</span>
+                  <span className="text-xl font-bold text-[#0B5394]">{receiptRecord.amount}</span>
+                </div>
+
+                <p className="pt-2 text-center text-xs text-slate-400">
+                  Thank you for your payment.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

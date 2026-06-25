@@ -16,19 +16,17 @@ interface GuardianRequest {
   status: "Pending" | "Approved" | "Rejected";
   students: string[];
   document: string;
-  documentType: string;
   accent: "sky" | "mint" | "rose";
 }
 
-const requests: GuardianRequest[] = [
+const seedRequests: GuardianRequest[] = [
   {
     id: 1,
     name: "Maya Thompson",
     relation: "Mother",
     status: "Pending",
     students: ["Emma Mitchell", "Liam Mitchell"],
-    document: "State ID (Drivers License)",
-    documentType: "ID",
+    document: "CNIC",
     accent: "sky",
   },
   {
@@ -37,8 +35,7 @@ const requests: GuardianRequest[] = [
     relation: "Guardian (Grandfather)",
     status: "Approved",
     students: ["Sophia Ortiz"],
-    document: "Passport",
-    documentType: "Passport",
+    document: "CNIC",
     accent: "mint",
   },
   {
@@ -47,8 +44,7 @@ const requests: GuardianRequest[] = [
     relation: "Step-Mother",
     status: "Rejected",
     students: ["Noah Kim"],
-    document: "State ID",
-    documentType: "ID",
+    document: "CNIC",
     accent: "rose",
   },
 ];
@@ -74,18 +70,36 @@ const accentStyles = {
 };
 
 export function GuardianApprovalsPage() {
+  const [requests, setRequests] = useState<GuardianRequest[]>(seedRequests);
   const [activeFilter, setActiveFilter] = useState("All");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const filteredRequests = useMemo(() => {
     if (activeFilter === "All") return requests;
     return requests.filter((request) => request.status === activeFilter);
-  }, [activeFilter]);
+  }, [requests, activeFilter]);
 
   const toggleSelection = (id: number) => {
     setSelectedIds((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id]
     );
+  };
+
+  const setStatus = (id: number, status: GuardianRequest["status"]) => {
+    setRequests((current) =>
+      current.map((request) =>
+        request.id === id ? { ...request, status } : request
+      )
+    );
+  };
+
+  const approveSelected = () => {
+    setRequests((current) =>
+      current.map((request) =>
+        selectedIds.includes(request.id) ? { ...request, status: "Approved" } : request
+      )
+    );
+    setSelectedIds([]);
   };
 
   return (
@@ -182,7 +196,7 @@ export function GuardianApprovalsPage() {
                         className="inline-flex items-center gap-1 text-sm font-semibold text-[#0B5394]"
                       >
                         <Eye size={15} />
-                        View ID
+                        View CNIC
                       </button>
                     </div>
                   </div>
@@ -190,12 +204,14 @@ export function GuardianApprovalsPage() {
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     <button
                       type="button"
+                      onClick={() => setStatus(request.id, "Rejected")}
                       className="rounded-2xl border border-[#C2410C] bg-white px-3 py-2.5 text-sm font-semibold text-[#C2410C] transition hover:bg-[#FFF7ED]"
                     >
                       Reject
                     </button>
                     <button
                       type="button"
+                      onClick={() => setStatus(request.id, "Approved")}
                       className="rounded-2xl bg-[#006666] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#005454]"
                     >
                       Approve
@@ -216,7 +232,11 @@ export function GuardianApprovalsPage() {
             </span>
             <span className="text-sm font-semibold">{selectedIds.length} selected</span>
           </div>
-          <button type="button" className="rounded-full bg-[#006666] px-3 py-1.5 text-sm font-semibold text-white">
+          <button
+            type="button"
+            onClick={approveSelected}
+            className="rounded-full bg-[#006666] px-3 py-1.5 text-sm font-semibold text-white"
+          >
             Approve All
           </button>
         </div>

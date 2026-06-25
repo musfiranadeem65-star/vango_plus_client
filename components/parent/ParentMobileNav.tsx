@@ -2,20 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Icon } from "@/components/admin/Icon";
-import { ADMIN_NAV_ITEMS } from "@/lib/admin/constants";
+import {
+  PARENT_MOBILE_NAV_LABELS,
+  PARENT_NAV_ITEMS,
+} from "@/lib/parent/constants";
 import { cn } from "@/lib/utils";
 
-export function AdminMobileNav() {
+export function ParentMobileNav() {
   const pathname = usePathname();
-  const mobileItems = ADMIN_NAV_ITEMS.filter((item) =>
-    ["Dashboard", "Students", "Drivers", "Routes", "Settings"].includes(item.label)
+  const mobileItems = PARENT_NAV_ITEMS.filter((item) =>
+    PARENT_MOBILE_NAV_LABELS.includes(item.label)
   );
 
   return (
-    <nav className="fixed bottom-0 left-0 z-40 flex h-20 w-full items-center justify-around border-t border-outline-variant bg-surface pb-safe shadow-lg lg:hidden">
+    <nav className="fixed bottom-0 left-0 z-40 flex h-20 w-full items-center justify-around border-t border-outline-variant bg-surface shadow-lg lg:hidden">
       {mobileItems.map((item) => {
         const active = pathname === item.href;
+        const ItemIcon = item.icon;
 
         return (
           <Link
@@ -26,9 +29,9 @@ export function AdminMobileNav() {
               active ? "font-bold text-secondary" : "text-on-surface-variant"
             )}
           >
-            <Icon name={item.icon} filled={active} size={22} />
+            <ItemIcon size={22} />
             <span className="mt-0.5 font-[family-name:var(--font-inter)] text-xs font-semibold">
-              {item.label}
+              {item.label === "Dashboard" ? "Home" : item.label}
             </span>
           </Link>
         );

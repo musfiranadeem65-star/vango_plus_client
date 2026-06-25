@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ChevronDown,
-  CirclePlus,
   GripVertical,
   MapPin,
   Plus,
@@ -23,7 +22,7 @@ interface RouteCard {
   accent: "blue" | "orange";
 }
 
-const routes: RouteCard[] = [
+const seedRoutes: RouteCard[] = [
   {
     id: 1,
     name: "North Loop Express",
@@ -49,15 +48,99 @@ const statusStyles = {
   Maintenance: "bg-amber-50 text-amber-700",
 };
 
-export function RoutesManagementPage() {
-  const [selectedRoute, setSelectedRoute] = useState<RouteCard | null>(routes[0]);
-  const [routeName, setRouteName] = useState("North Loop Express");
-  const [assignDriver, setAssignDriver] = useState("David Anderson");
+interface RouteStop {
+  id: number;
+  name: string;
+  time: string;
+}
 
-  const selectedRouteMeta = useMemo(() => {
-    if (!selectedRoute) return null;
-    return selectedRoute;
-  }, [selectedRoute]);
+const defaultStops: RouteStop[] = [
+  { id: 1, name: "Maplewood Heights", time: "07:15 AM" },
+  { id: 2, name: "Riverside Court", time: "07:32 AM" },
+  { id: 3, name: "Lincoln Park", time: "07:48 AM" },
+];
+
+export function RoutesManagementPage() {
+  const [routes, setRoutes] = useState<RouteCard[]>(seedRoutes);
+  const [selectedRoute, setSelectedRoute] = useState<RouteCard | null>(seedRoutes[0]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"add" | "edit">("add");
+  const [routeName, setRouteName] = useState("");
+  const [assignDriver, setAssignDriver] = useState("David Anderson");
+  const [stops, setStops] = useState<RouteStop[]>(defaultStops);
+
+  function openAddRoute() {
+    setFormMode("add");
+    setEditingId(null);
+    setRouteName("");
+    setAssignDriver("David Anderson");
+    setStops([]);
+    setIsFormOpen(true);
+  }
+
+  function openEditRoute(route: RouteCard) {
+    setFormMode("edit");
+    setEditingId(route.id);
+    setSelectedRoute(route);
+    setRouteName(route.name);
+    setAssignDriver(route.driver);
+    setStops(defaultStops);
+    setIsFormOpen(true);
+  }
+
+  function handleSaveRoute() {
+    if (!routeName.trim()) return;
+
+    const stopCount = stops.filter((stop) => stop.name.trim()).length;
+
+    if (formMode === "add") {
+      setRoutes((current) => [
+        ...current,
+        {
+          id: Date.now(),
+          name: routeName.trim(),
+          status: "Active",
+          driver: assignDriver,
+          stops: stopCount,
+          students: 0,
+          accent: "blue",
+        },
+      ]);
+    } else if (editingId !== null) {
+      setRoutes((current) =>
+        current.map((route) =>
+          route.id === editingId
+            ? {
+                ...route,
+                name: routeName.trim(),
+                driver: assignDriver,
+                stops: stopCount,
+              }
+            : route
+        )
+      );
+    }
+
+    setIsFormOpen(false);
+  }
+
+  function addStop() {
+    setStops((current) => [
+      ...current,
+      { id: Date.now(), name: "", time: "" },
+    ]);
+  }
+
+  function removeStop(id: number) {
+    setStops((current) => current.filter((stop) => stop.id !== id));
+  }
+
+  function updateStop(id: number, field: "name" | "time", value: string) {
+    setStops((current) =>
+      current.map((stop) => (stop.id === id ? { ...stop, [field]: value } : stop))
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col">
@@ -70,10 +153,11 @@ export function RoutesManagementPage() {
             </div>
             <button
               type="button"
-              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0B5394] text-white shadow-sm transition hover:bg-[#084c7a]"
-              aria-label="Add route"
+              onClick={openAddRoute}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0B5394] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#084c7a]"
             >
-              <Plus size={18} />
+              <Plus size={16} />
+              Add Route
             </button>
           </div>
         </header>
@@ -133,16 +217,14 @@ export function RoutesManagementPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="mt-4">
                     <button
                       type="button"
-                      className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                    >
-                      View Detail
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-2xl bg-[#0B5394] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEditRoute(route);
+                      }}
+                      className="w-full rounded-2xl bg-[#0B5394] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
                     >
                       Edit
                     </button>
@@ -151,107 +233,139 @@ export function RoutesManagementPage() {
               );
             })}
           </div>
-
-          <button
-            type="button"
-            className="mt-4 flex w-full flex-col items-center justify-center rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center transition hover:bg-slate-100"
-          >
-            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[#EAF6FF] text-[#0B5394]">
-              <CirclePlus size={22} />
-            </div>
-            <span className="text-sm font-semibold text-slate-700">Create New Route</span>
-          </button>
         </div>
       </div>
 
-      <aside className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-6xl border-t border-slate-200 bg-white px-4 py-4 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] lg:static lg:mt-5 lg:max-w-none lg:rounded-[24px] lg:border lg:px-5 lg:py-5 lg:shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900">Edit Route</h3>
-            <p className="mt-1 text-sm text-slate-500">Modify route details and stop sequence</p>
-          </div>
-          <button
-            type="button"
-            className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-100"
-            aria-label="Close edit route"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="mt-4 space-y-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Route Name</label>
-            <input
-              value={routeName}
-              onChange={(event) => setRouteName(event.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Assign Driver</label>
-            <div className="relative">
-              <select
-                value={assignDriver}
-                onChange={(event) => setAssignDriver(event.target.value)}
-                className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
-              >
-                <option>David Anderson</option>
-                <option>Mina Patel</option>
-                <option>Peter Brooks</option>
-              </select>
-              <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            </div>
-          </div>
-
-          <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-slate-900">Route Sequence</h4>
-              <button type="button" className="text-sm font-semibold text-[#0B5394]">
-                + Add Stop
-              </button>
-            </div>
-
-            <div className="mt-3 space-y-2">
-              {[
-                { number: 1, name: "Maplewood Heights", time: "07:15 AM" },
-                { number: 2, name: "Riverside Court", time: "07:32 AM" },
-                { number: 3, name: "Lincoln Park", time: "07:48 AM" },
-              ].map((stop) => (
-                <div key={stop.number} className="flex items-center gap-3 rounded-2xl bg-white px-3 py-3 shadow-sm">
-                  <GripVertical size={16} className="text-slate-400" />
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0B5394] text-sm font-semibold text-white">
-                    {stop.number}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-slate-800">{stop.name}</p>
-                    <p className="text-xs text-slate-500">ETA: {stop.time}</p>
-                  </div>
-                  <button type="button" className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-red-500">
-                    <Trash2 size={15} />
-                  </button>
+      {isFormOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setIsFormOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="relative w-full max-w-md">
+            <div className="max-h-[calc(100vh-4rem)] overflow-y-auto rounded-[24px] border border-slate-200 bg-white p-5 shadow-xl">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    {formMode === "add" ? "Add Route" : "Edit Route"}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {formMode === "add"
+                      ? "Create a new transportation loop"
+                      : "Modify route details and stop sequence"}
+                  </p>
                 </div>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setIsFormOpen(false)}
+                  className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-100"
+                  aria-label="Close route form"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Route Name</label>
+                  <input
+                    value={routeName}
+                    onChange={(event) => setRouteName(event.target.value)}
+                    placeholder="e.g. North Loop Express"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Assign Driver</label>
+                  <div className="relative">
+                    <select
+                      value={assignDriver}
+                      onChange={(event) => setAssignDriver(event.target.value)}
+                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
+                    >
+                      <option>David Anderson</option>
+                      <option>Mina Patel</option>
+                      <option>Peter Brooks</option>
+                    </select>
+                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+
+                <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-slate-900">Route Sequence</h4>
+                    <button
+                      type="button"
+                      onClick={addStop}
+                      className="text-sm font-semibold text-[#0B5394]"
+                    >
+                      + Add Stop
+                    </button>
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {stops.length === 0 ? (
+                      <p className="rounded-2xl border border-dashed border-slate-300 bg-white px-3 py-4 text-center text-xs text-slate-400">
+                        No stops yet. Tap “Add Stop” to build the sequence.
+                      </p>
+                    ) : (
+                      stops.map((stop, index) => (
+                        <div key={stop.id} className="flex items-center gap-3 rounded-2xl bg-white px-3 py-3 shadow-sm">
+                          <GripVertical size={16} className="text-slate-400" />
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0B5394] text-sm font-semibold text-white">
+                            {index + 1}
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-1.5">
+                            <input
+                              value={stop.name}
+                              onChange={(event) => updateStop(stop.id, "name", event.target.value)}
+                              placeholder="Stop name"
+                              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#0B5394] focus:bg-white"
+                            />
+                            <input
+                              value={stop.time}
+                              onChange={(event) => updateStop(stop.id, "time", event.target.value)}
+                              placeholder="ETA (e.g. 07:15 AM)"
+                              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-500 outline-none transition focus:border-[#0B5394] focus:bg-white"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeStop(stop.id)}
+                            className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-red-500"
+                            aria-label="Remove stop"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-2 border-t border-slate-200 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsFormOpen(false)}
+                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveRoute}
+                  className="rounded-2xl bg-[#0B5394] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
+                >
+                  Save Route
+                </button>
+              </div>
             </div>
           </div>
         </div>
-
-        <div className="mt-5 grid grid-cols-2 gap-2 border-t border-slate-200 pt-4">
-          <button
-            type="button"
-            className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="rounded-2xl bg-[#0B5394] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
-          >
-            Save Route
-          </button>
-        </div>
-      </aside>
+      ) : null}
     </div>
   );
 }

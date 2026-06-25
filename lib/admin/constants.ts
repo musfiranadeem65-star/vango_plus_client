@@ -11,7 +11,6 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { label: "Routes", href: "/admin/routes", icon: "alt_route" },
   { label: "Guardians", href: "/admin/guardians", icon: "family_restroom" },
   { label: "Subscriptions", href: "/admin/subscriptions", icon: "payments" },
-  { label: "Alerts", href: "/admin/alerts", icon: "notifications" },
   { label: "Settings", href: "/admin/settings", icon: "settings" },
 ];
 
@@ -27,12 +26,14 @@ export const DASHBOARD_STATS = [
     value: "124",
     label: "Students",
     tone: "primary" as const,
+    href: "/admin/students",
   },
   {
     icon: "directions_bus",
     value: "18",
     label: "Drivers",
     tone: "secondary" as const,
+    href: "/admin/drivers",
   },
   {
     icon: "family_restroom",
@@ -40,12 +41,14 @@ export const DASHBOARD_STATS = [
     label: "Pending",
     tone: "tertiary" as const,
     badge: "URGENT",
+    href: "/admin/guardians",
   },
   {
     icon: "payments",
     value: "12",
     label: "Subs Due",
     tone: "neutral" as const,
+    href: "/admin/subscriptions",
   },
 ];
 
@@ -76,6 +79,47 @@ export const GUARDIAN_APPROVALS = [
       "https://lh3.googleusercontent.com/aida-public/AB6AXuC2oOyoue7thlMb1-a7llgbMOiChB3bwTFxVFHLqVEepVVwIolDCvjfN8FdPurR9_ICTwJeX1tiblnd6YkImlmSN1-UxXxV4ujTnRg62bcgcJZJ_-kq2vsnfYPkcDTwWO6Se7jlLUOvEjkcGcKnMjPRedAu67wi7AjdvONC1VmZ9PmTsKGC4bErvHb6AySsxdlDYVAT5GAXt2gIXyA3m5A88DMMWSlICzYbndsh1OSJgmCLNiTrbjyLrFq8YpG9cANUk_s2gwIyBLdP",
     requestedAt: "Oct 22, 2023",
     status: "Pending",
+  },
+];
+
+export const RECENT_STUDENTS = [
+  {
+    id: "s1",
+    name: "Ava Thompson",
+    grade: "Grade 4",
+    parent: "Maya Thompson",
+    status: "Active",
+  },
+  {
+    id: "s2",
+    name: "Noah Bennett",
+    grade: "Grade 5",
+    parent: "Liam Bennett",
+    status: "Active",
+  },
+  {
+    id: "s3",
+    name: "Sophia Carter",
+    grade: "Grade 3",
+    parent: "Claire Carter",
+    status: "Active",
+  },
+];
+
+export const RECENT_DRIVERS = [
+  {
+    id: "d1",
+    name: "David Anderson",
+    phone: "+1 (555) 010-4821",
+    routeLabel: "Assigned Route",
+    status: "Active",
+  },
+  {
+    id: "d2",
+    name: "Mina Patel",
+    phone: "+1 (555) 014-7712",
+    routeLabel: "Unassigned",
+    status: "Active",
   },
 ];
 

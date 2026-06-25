@@ -1,9 +1,10 @@
+import { DashboardStats } from "@/components/admin/DashboardStats";
 import {
-  DashboardQuickActions,
-  DashboardStats,
-} from "@/components/admin/DashboardStats";
+  RecentDriversTable,
+  RecentRoutesOverviewTable,
+  RecentStudentsTable,
+} from "@/components/admin/DashboardOverviewTables";
 import { GuardianApprovalsTable } from "@/components/admin/GuardianApprovalsTable";
-import { TransportActivityTimeline } from "@/components/admin/TransportActivityTimeline";
 
 function getFormattedDate() {
   return new Intl.DateTimeFormat("en-US", {
@@ -30,9 +31,12 @@ export default function AdminDashboardPage() {
 
       <GuardianApprovalsTable />
 
-      <TransportActivityTimeline />
+      <div className="grid gap-6 xl:grid-cols-2">
+        <RecentStudentsTable />
+        <RecentDriversTable />
+      </div>
 
-      <DashboardQuickActions />
+      <RecentRoutesOverviewTable />
     </div>
   );
 }

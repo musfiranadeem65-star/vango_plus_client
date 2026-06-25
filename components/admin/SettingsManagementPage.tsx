@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Save } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { changePassword } from "@/lib/auth/mock-auth";
 
 interface SettingsSectionProps {
   title: string;
@@ -18,17 +20,57 @@ function SettingsSection({ title, children }: SettingsSectionProps) {
 }
 
 export function SettingsManagementPage() {
+  const { user } = useAuth();
   const [schoolName, setSchoolName] = useState("St. Andrews International");
   const [contactPerson, setContactPerson] = useState("Robert Wilson");
   const [address, setAddress] = useState("123 North Avenue, Suite 4, London, UK");
   const [monthlyAmount, setMonthlyAmount] = useState("4500");
-  const [smtpHost, setSmtpHost] = useState("smtp.gmail.com");
-  const [port, setPort] = useState("587");
-  const [encryption, setEncryption] = useState("TLS");
   const [senderEmail, setSenderEmail] = useState("notifications@vangoplus.com");
-  const [currentPassword, setCurrentPassword] = useState("********");
-  const [newPassword, setNewPassword] = useState("********");
-  const [confirmPassword, setConfirmPassword] = useState("********");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordStatus, setPasswordStatus] = useState<
+    { type: "success" | "error"; message: string } | null
+  >(null);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+
+  async function handleChangePassword() {
+    setPasswordStatus(null);
+
+    if (!user) {
+      setPasswordStatus({ type: "error", message: "You must be signed in." });
+      return;
+    }
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordStatus({ type: "error", message: "Please fill in all password fields." });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordStatus({ type: "error", message: "New password must be at least 6 characters." });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus({ type: "error", message: "New passwords do not match." });
+      return;
+    }
+
+    setIsSavingPassword(true);
+    const result = await changePassword(user.email, currentPassword, newPassword);
+    setIsSavingPassword(false);
+
+    if (result.error) {
+      setPasswordStatus({ type: "error", message: result.error });
+      return;
+    }
+
+    setPasswordStatus({ type: "success", message: "Password updated successfully." });
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col">
@@ -40,7 +82,7 @@ export function SettingsManagementPage() {
         </header>
 
         <div className="space-y-4 px-3 py-4 sm:px-4 lg:px-5 lg:py-5">
-          <SettingsSection title="School Information">
+          <SettingsSection title="General Settings">
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-slate-700">School Name</label>
               <input
@@ -69,16 +111,6 @@ export function SettingsManagementPage() {
               />
             </div>
 
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0B5394] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
-            >
-              <Save size={16} />
-              Save Changes
-            </button>
-          </SettingsSection>
-
-          <SettingsSection title="Fee Settings">
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-slate-700">Monthly Amount (Rs.)</label>
               <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 focus-within:border-[#0B5394] focus-within:bg-white">
@@ -92,55 +124,15 @@ export function SettingsManagementPage() {
               <p className="mt-2 text-sm text-slate-500">This amount will be applied to all active student subscriptions.</p>
             </div>
 
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0B5394] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
-            >
-              <Save size={16} />
-              Save Changes
-            </button>
-          </SettingsSection>
-
-          <SettingsSection title="Email Configuration (SMTP)">
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-slate-700">SMTP Host</label>
-              <input
-                value={smtpHost}
-                onChange={(event) => setSmtpHost(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Port</label>
-                <input
-                  value={port}
-                  onChange={(event) => setPort(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Encryption</label>
-                <select
-                  value={encryption}
-                  onChange={(event) => setEncryption(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
-                >
-                  <option>TLS</option>
-                  <option>SSL</option>
-                  <option>None</option>
-                </select>
-              </div>
-            </div>
-
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-slate-700">Sender Email</label>
               <input
+                type="email"
                 value={senderEmail}
                 onChange={(event) => setSenderEmail(event.target.value)}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
               />
+              <p className="mt-2 text-sm text-slate-500">Notifications to parents will be sent from this address.</p>
             </div>
 
             <button
@@ -183,12 +175,24 @@ export function SettingsManagementPage() {
               />
             </div>
 
+            {passwordStatus ? (
+              <p
+                className={`text-sm font-medium ${
+                  passwordStatus.type === "success" ? "text-emerald-600" : "text-rose-600"
+                }`}
+              >
+                {passwordStatus.message}
+              </p>
+            ) : null}
+
             <button
               type="button"
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0B5394] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
+              onClick={handleChangePassword}
+              disabled={isSavingPassword}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0B5394] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#084c7a] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Save size={16} />
-              Save Changes
+              {isSavingPassword ? "Saving..." : "Save Changes"}
             </button>
           </SettingsSection>
         </div>

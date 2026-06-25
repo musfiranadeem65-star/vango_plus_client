@@ -1,211 +1,337 @@
 "use client";
 
+import { useState } from "react";
 import {
   AlertTriangle,
-  Bell,
   CalendarDays,
   CheckCircle2,
-  Compass,
-  Home,
+  Headset,
   MapPin,
-  MessageCircleMore,
   Navigation,
-  Plus,
-  Route,
-  Settings,
-  ShieldCheck,
-  Users,
+  UserPlus,
   Wallet,
 } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { AddGuardianDrawer } from "@/components/parent/AddGuardianDrawer";
+import { SubscribePlansModal } from "@/components/parent/SubscribePlansModal";
+import { PARENT_PROFILE } from "@/lib/parent/constants";
+import { formatPkr } from "@/lib/subscription/plans";
 
-function ParentDashboardPage() {
+type TripPhase = "waiting" | "picked_up" | "dropped";
+
+interface ChildTrip {
+  id: string;
+  name: string;
+  route: string;
+  initials: string;
+  accent: "blue" | "teal" | "slate";
+  pickup: string;
+  drop: string;
+  phase: TripPhase;
+}
+
+const initialChildren: ChildTrip[] = [
+  {
+    id: "leo",
+    name: "Leo",
+    route: "Route #42B",
+    initials: "L",
+    accent: "blue",
+    pickup: "7:45 AM",
+    drop: "8:15 AM",
+    phase: "picked_up",
+  },
+  {
+    id: "maya",
+    name: "Maya",
+    route: "Route #15A",
+    initials: "M",
+    accent: "teal",
+    pickup: "7:50 AM",
+    drop: "8:20 AM",
+    phase: "dropped",
+  },
+  {
+    id: "sam",
+    name: "Sam",
+    route: "Route #28C",
+    initials: "S",
+    accent: "slate",
+    pickup: "7:55 AM",
+    drop: "8:25 AM",
+    phase: "waiting",
+  },
+];
+
+const accentAvatar: Record<ChildTrip["accent"], string> = {
+  blue: "bg-primary-fixed text-primary",
+  teal: "bg-secondary-container text-on-secondary-container",
+  slate: "bg-surface-container text-on-surface-variant",
+};
+
+const phaseBadge: Record<TripPhase, { label: string; className: string }> = {
+  waiting: {
+    label: "Waiting",
+    className: "bg-surface-container text-on-surface-variant",
+  },
+  picked_up: {
+    label: "Picked Up",
+    className: "bg-primary text-white",
+  },
+  dropped: {
+    label: "Dropped Safely",
+    className: "bg-secondary-container text-on-secondary-container",
+  },
+};
+
+function ChildTripCard({
+  child,
+  onSetPhase,
+}: {
+  child: ChildTrip;
+  onSetPhase: (id: string, phase: TripPhase) => void;
+}) {
+  const badge = phaseBadge[child.phase];
+
   return (
-    <div className="min-h-screen bg-[#f7f8fb] px-3 pb-24 pt-3 text-slate-900 sm:px-4 sm:pt-4 lg:px-6 lg:pb-8">
-      <div className="mx-auto max-w-6xl rounded-[28px] border border-slate-200 bg-white shadow-[0_16px_50px_rgba(15,23,42,0.06)]">
-        <header className="border-b border-slate-200 px-4 py-4 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-[#0B5394]">
-              <ShieldCheck size={18} />
-              <h1 className="text-base font-bold sm:text-lg">VanGo Plus</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
-                aria-label="Notifications"
-              >
-                <Bell size={18} />
-              </button>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0B5394] text-sm font-semibold text-white">
-                SR
-              </div>
-            </div>
+    <article className="flex flex-col rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-card)] transition hover:shadow-[var(--shadow-card-hover)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex h-12 w-12 items-center justify-center rounded-full text-base font-semibold ${accentAvatar[child.accent]}`}
+          >
+            {child.initials}
           </div>
-
-          <div className="mt-5">
-            <h2 className="text-2xl font-bold text-slate-900 sm:text-[28px]">Hello, Sarah 👋</h2>
-            <p className="mt-1 text-sm text-slate-500">Your children are in safe hands today.</p>
+          <div>
+            <h3 className="text-base font-bold text-foreground">{child.name}</h3>
+            <p className="font-[family-name:var(--font-inter)] text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+              {child.route}
+            </p>
           </div>
-        </header>
+        </div>
 
-        <main className="space-y-4 px-3 py-4 sm:px-4 lg:px-5 lg:py-5">
-          <section className="flex items-start justify-between gap-3 rounded-[24px] border border-amber-200 bg-amber-50 p-4">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-                <AlertTriangle size={18} />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">Subscription Renewal</h3>
-                <p className="mt-1 text-sm text-slate-600">
-                  Your monthly plan expires in 3 days. Renew now to avoid service interruption.
-                </p>
-              </div>
-            </div>
-            <button type="button" className="text-sm font-semibold text-amber-800">
-              RENEW
-            </button>
-          </section>
-
-          <section className="space-y-3">
-            <article className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EAF6FF] text-sm font-semibold text-[#0B5394]">
-                    L
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-900">Leo</h3>
-                    <p className="text-sm text-slate-500">ROUTE #42B</p>
-                  </div>
-                </div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#0B5394] px-3 py-1.5 text-xs font-semibold text-white">
-                  <Navigation size={13} />
-                  Picked Up
-                </span>
-              </div>
-
-              <div className="mt-4 rounded-[20px] bg-slate-50 p-3">
-                <div className="flex items-center gap-2 text-sm text-slate-700">
-                  <MapPin size={16} className="text-slate-500" />
-                  <span>Current Location: Park Avenue</span>
-                </div>
-                <div className="mt-3 flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-                  <span>Pickup: 7:45 AM</span>
-                  <span>Est. Drop: 8:15 AM</span>
-                </div>
-                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200">
-                  <div className="h-full w-[62%] rounded-full bg-[#0B5394]" />
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-center">
-                <button type="button" className="inline-flex items-center gap-2 text-sm font-semibold text-[#0F766E]">
-                  <Compass size={16} />
-                  View Live Map
-                </button>
-              </div>
-            </article>
-
-            <article className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EAFBF4] text-sm font-semibold text-[#0F766E]">
-                    M
-                  </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-900">Maya</h3>
-                    <p className="text-sm text-slate-500">ROUTE #15A</p>
-                  </div>
-                </div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                  <CheckCircle2 size={13} />
-                  Dropped Safely
-                </span>
-              </div>
-
-              <p className="mt-4 text-center text-sm text-slate-700">
-                Maya was dropped off at St. Mary&apos;s School at 8:02 AM.
-              </p>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <button type="button" className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                  View History
-                </button>
-                <button type="button" className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                  Notify Driver
-                </button>
-              </div>
-            </article>
-
-            <article className="flex items-center justify-between rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm">
-                  <Users size={20} />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">No Morning Trips</h3>
-                  <p className="text-sm text-slate-500">Scheduled for 3:30 PM</p>
-                </div>
-              </div>
-              <span className="rounded-full bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600">
-                Not Started
-              </span>
-            </article>
-          </section>
-
-          <section>
-            <h3 className="mb-3 text-lg font-semibold text-slate-900">Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Add Guardian", icon: Plus, accent: "bg-emerald-100 text-emerald-700" },
-                { label: "Pay Fee", icon: Wallet, accent: "bg-amber-100 text-amber-700" },
-                { label: "View Schedule", icon: CalendarDays, accent: "bg-sky-100 text-sky-700" },
-                { label: "Contact Support", icon: MessageCircleMore, accent: "bg-violet-100 text-violet-700" },
-              ].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.label}
-                    type="button"
-                    className="flex flex-col items-center justify-center gap-2 rounded-[20px] border border-slate-200 bg-white p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-full ${item.accent}`}>
-                      <Icon size={20} />
-                    </div>
-                    <span className="text-sm font-semibold text-slate-700">{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        </main>
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ${badge.className}`}
+        >
+          {child.phase === "picked_up" ? <Navigation size={13} /> : null}
+          {child.phase === "dropped" ? <CheckCircle2 size={13} /> : null}
+          {badge.label}
+        </span>
       </div>
 
-      <nav className="fixed bottom-0 left-0 z-40 flex w-full items-center justify-around border-t border-slate-200 bg-white px-2 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.06)] sm:px-4 lg:hidden">
-        {[
-          { label: "Home", icon: Home, active: true },
-          { label: "Children", icon: Users },
-          { label: "Schedule", icon: Route },
-          { label: "Alerts", icon: Bell },
-          { label: "Profile", icon: Settings },
-        ].map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.label}
-              type="button"
-              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-1 text-[11px] font-semibold ${
-                item.active ? "text-[#0F766E]" : "text-slate-500"
-              }`}
-            >
-              <Icon size={18} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-    </div>
+      <div className="mt-4 rounded-xl bg-surface-bright p-4">
+        <div className="flex items-center gap-2 text-sm text-foreground">
+          <MapPin size={16} className="text-muted" />
+          <span>Today&apos;s Trip</span>
+        </div>
+        <div className="mt-3 flex items-center justify-between font-[family-name:var(--font-inter)] text-xs font-medium text-on-surface-variant">
+          <span>Pickup: {child.pickup}</span>
+          <span>Drop: {child.drop}</span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() =>
+            onSetPhase(
+              child.id,
+              child.phase === "picked_up" ? "waiting" : "picked_up"
+            )
+          }
+          className={`inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${
+            child.phase === "picked_up"
+              ? "bg-primary text-white hover:bg-primary-container"
+              : "border border-border bg-surface text-foreground hover:bg-surface-container-low"
+          }`}
+        >
+          <Navigation size={16} />
+          Picked Up
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onSetPhase(
+              child.id,
+              child.phase === "dropped" ? "picked_up" : "dropped"
+            )
+          }
+          className={`inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${
+            child.phase === "dropped"
+              ? "bg-secondary text-white hover:opacity-90"
+              : "border border-border bg-surface text-foreground hover:bg-surface-container-low"
+          }`}
+        >
+          <CheckCircle2 size={16} />
+          Dropped
+        </button>
+      </div>
+    </article>
   );
 }
 
-export default ParentDashboardPage;
+export default function ParentDashboardPage() {
+  const { user, subscribe } = useAuth();
+  const firstName = user?.name?.trim().split(/\s+/)[0] ?? PARENT_PROFILE.firstName;
+  const subscription = user?.subscription;
+
+  const [children, setChildren] = useState<ChildTrip[]>(initialChildren);
+  const [planModalOpen, setPlanModalOpen] = useState(false);
+  const [guardianDrawerOpen, setGuardianDrawerOpen] = useState(false);
+
+  function setPhase(id: string, phase: TripPhase) {
+    setChildren((prev) =>
+      prev.map((child) => (child.id === id ? { ...child, phase } : child))
+    );
+  }
+
+  const quickActions = [
+    {
+      label: "Add Guardian",
+      icon: UserPlus,
+      tone: "bg-primary-fixed text-primary",
+      onClick: () => setGuardianDrawerOpen(true),
+    },
+    {
+      label: "Pay Fee",
+      icon: Wallet,
+      tone: "bg-secondary-container text-on-secondary-container",
+      onClick: () => setPlanModalOpen(true),
+    },
+    {
+      label: "View Schedule",
+      icon: CalendarDays,
+      tone: "bg-tertiary-fixed text-on-tertiary-fixed-variant",
+      onClick: undefined,
+    },
+    {
+      label: "Contact Support",
+      icon: Headset,
+      tone: "bg-surface-container-high text-on-surface-variant",
+      onClick: undefined,
+    },
+  ];
+
+  return (
+    <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground md:text-[32px] md:leading-10">
+            Hello, {firstName} 👋
+          </h1>
+          <p className="mt-1 font-[family-name:var(--font-inter)] text-sm font-medium text-on-surface-variant">
+            Your children are in safe hands today.
+          </p>
+        </div>
+      </section>
+
+      {subscription ? (
+        <section className="flex flex-col gap-3 rounded-2xl border border-secondary-container bg-secondary-container/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
+              <Wallet size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-foreground">
+                  {subscription.planName} Plan
+                </h3>
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary-container px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-on-secondary-container">
+                  <CheckCircle2 size={11} />
+                  Active
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-on-surface-variant">
+                {formatPkr(subscription.price)}/month · Paid via{" "}
+                {subscription.paymentMethod}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPlanModalOpen(true)}
+            className="shrink-0 rounded-xl border border-secondary px-4 py-2.5 text-sm font-semibold text-secondary transition hover:bg-secondary-container/50 sm:self-center"
+          >
+            Manage Plan
+          </button>
+        </section>
+      ) : (
+        <section className="flex flex-col gap-3 rounded-2xl border border-tertiary-fixed bg-tertiary-fixed/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tertiary-fixed text-tertiary">
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-foreground">No Active Plan</h3>
+              <p className="mt-1 text-sm text-on-surface-variant">
+                Subscribe to a transport plan to start booking trips for your
+                children.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPlanModalOpen(true)}
+            className="shrink-0 rounded-xl bg-tertiary px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 sm:self-center"
+          >
+            Choose a Plan
+          </button>
+        </section>
+      )}
+
+      <section>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-foreground">
+            Today&apos;s Tracking
+          </h2>
+          <span className="font-[family-name:var(--font-inter)] text-sm font-medium text-on-surface-variant">
+            {children.length} children
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {children.map((child) => (
+            <ChildTripCard key={child.id} child={child} onSetPhase={setPhase} />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-bold text-foreground">Quick Actions</h2>
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {quickActions.map((action) => {
+            const ActionIcon = action.icon;
+            return (
+              <button
+                key={action.label}
+                type="button"
+                onClick={action.onClick}
+                className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-5 text-center shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)]"
+              >
+                <span
+                  className={`flex h-12 w-12 items-center justify-center rounded-full ${action.tone}`}
+                >
+                  <ActionIcon size={22} />
+                </span>
+                <span className="text-sm font-semibold text-foreground">
+                  {action.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <SubscribePlansModal
+        open={planModalOpen}
+        onClose={() => setPlanModalOpen(false)}
+        onSubscribe={subscribe}
+        currentPlanId={subscription?.planId}
+      />
+
+      <AddGuardianDrawer
+        open={guardianDrawerOpen}
+        onClose={() => setGuardianDrawerOpen(false)}
+      />
+    </div>
+  );
+}

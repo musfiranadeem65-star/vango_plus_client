@@ -7,7 +7,6 @@ import {
   PencilLine,
   Plus,
   Search,
-  Slash,
   X,
 } from "lucide-react";
 
@@ -16,18 +15,20 @@ interface DriverCard {
   name: string;
   status: "Active" | "Inactive";
   phone: string;
+  email: string;
   license: string;
   route: string;
   routeLabel: string;
   initials: string;
 }
 
-const drivers: DriverCard[] = [
+const seedDrivers: DriverCard[] = [
   {
     id: 1,
     name: "David Anderson",
     status: "Active",
     phone: "+1 (555) 010-4821",
+    email: "david.anderson@vango.com",
     license: "TX-482149",
     route: "Northview Academy AM",
     routeLabel: "Assigned Route",
@@ -38,6 +39,7 @@ const drivers: DriverCard[] = [
     name: "Mina Patel",
     status: "Inactive",
     phone: "+1 (555) 014-7712",
+    email: "mina.patel@vango.com",
     license: "TX-881204",
     route: "No route history",
     routeLabel: "Unassigned",
@@ -45,8 +47,98 @@ const drivers: DriverCard[] = [
   },
 ];
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export function DriversManagementPage() {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(true);
+  const [drivers, setDrivers] = useState<DriverCard[]>(seedDrivers);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"add" | "edit">("add");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [searchText, setSearchText] = useState("");
+  const [formName, setFormName] = useState("");
+  const [formPhone, setFormPhone] = useState("");
+  const [formEmail, setFormEmail] = useState("");
+  const [formLicense, setFormLicense] = useState("");
+  const [formRoute, setFormRoute] = useState("");
+
+  const filteredDrivers = drivers.filter((driver) =>
+    [driver.name, driver.phone, driver.license, driver.route]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchText.toLowerCase())
+  );
+
+  function openAddDriver() {
+    setFormMode("add");
+    setEditingId(null);
+    setFormName("");
+    setFormPhone("");
+    setFormEmail("");
+    setFormLicense("");
+    setFormRoute("");
+    setIsDrawerOpen(true);
+  }
+
+  function openEditDriver(driver: DriverCard) {
+    setFormMode("edit");
+    setEditingId(driver.id);
+    setFormName(driver.name);
+    setFormPhone(driver.phone);
+    setFormEmail(driver.email);
+    setFormLicense(driver.license);
+    setFormRoute(driver.routeLabel === "Unassigned" ? "" : driver.route);
+    setIsDrawerOpen(true);
+  }
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!formName.trim()) return;
+
+    const hasRoute = Boolean(formRoute);
+    const route = hasRoute ? formRoute : "No route history";
+    const routeLabel = hasRoute ? "Assigned Route" : "Unassigned";
+
+    if (formMode === "add") {
+      setDrivers((current) => [
+        {
+          id: Date.now(),
+          name: formName.trim(),
+          status: "Active",
+          phone: formPhone || "—",
+          email: formEmail,
+          license: formLicense || "—",
+          route,
+          routeLabel,
+          initials: getInitials(formName),
+        },
+        ...current,
+      ]);
+    } else if (editingId !== null) {
+      setDrivers((current) =>
+        current.map((driver) =>
+          driver.id === editingId
+            ? {
+                ...driver,
+                name: formName.trim(),
+                phone: formPhone || driver.phone,
+                email: formEmail,
+                license: formLicense || driver.license,
+                route,
+                routeLabel,
+                initials: getInitials(formName),
+              }
+            : driver
+        )
+      );
+    }
+
+    setIsDrawerOpen(false);
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col">
@@ -59,7 +151,7 @@ export function DriversManagementPage() {
             </div>
             <button
               type="button"
-              onClick={() => setIsDrawerOpen(true)}
+              onClick={openAddDriver}
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0B5394] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
             >
               <Plus size={16} />
@@ -71,15 +163,17 @@ export function DriversManagementPage() {
             <Search size={17} className="text-slate-400" />
             <input
               type="text"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
               placeholder="Search drivers..."
               className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
             />
           </label>
         </header>
 
-        <div className="flex flex-col gap-6 px-3 py-4 sm:px-4 lg:flex-row lg:px-5 lg:py-5">
+        <div className="flex flex-col gap-6 px-3 py-4 sm:px-4 lg:px-5 lg:py-5">
           <section className="flex-1 space-y-3">
-            {drivers.map((driver) => (
+            {filteredDrivers.map((driver) => (
               <article key={driver.id} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
@@ -100,17 +194,11 @@ export function DriversManagementPage() {
                   <div className="flex gap-2">
                     <button
                       type="button"
+                      onClick={() => openEditDriver(driver)}
                       className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-100 bg-sky-50 text-sky-700 transition hover:bg-sky-100"
                       aria-label={`Edit ${driver.name}`}
                     >
                       <PencilLine size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      className="flex h-9 w-9 items-center justify-center rounded-full border border-rose-100 bg-rose-50 text-rose-600 transition hover:bg-rose-100"
-                      aria-label={`Toggle ${driver.name}`}
-                    >
-                      <Slash size={16} />
                     </button>
                   </div>
                 </div>
@@ -147,13 +235,24 @@ export function DriversManagementPage() {
               </article>
             ))}
           </section>
+        </div>
+      </div>
 
-          <aside className={`${isDrawerOpen ? "block" : "hidden lg:block"} w-full lg:w-[340px]`}>
-            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto">
+      {isDrawerOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setIsDrawerOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="relative w-full max-w-md">
+            <div className="max-h-[calc(100vh-4rem)] overflow-y-auto rounded-[24px] border border-slate-200 bg-white p-5 shadow-xl">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-[#0B5394]">Quick Setup</p>
-                  <h3 className="text-xl font-semibold text-slate-900">Add New Driver</h3>
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    {formMode === "add" ? "Add New Driver" : "Edit Driver"}
+                  </h3>
                 </div>
                 <button
                   type="button"
@@ -165,11 +264,13 @@ export function DriversManagementPage() {
                 </button>
               </div>
 
-              <form className="mt-6 space-y-4">
+              <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">Full Name</label>
                   <input
                     type="text"
+                    value={formName}
+                    onChange={(event) => setFormName(event.target.value)}
                     placeholder="e.g. John Doe"
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
                   />
@@ -179,6 +280,8 @@ export function DriversManagementPage() {
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">Phone Number</label>
                   <input
                     type="tel"
+                    value={formPhone}
+                    onChange={(event) => setFormPhone(event.target.value)}
                     placeholder="(555) 000-0000"
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
                   />
@@ -188,6 +291,8 @@ export function DriversManagementPage() {
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">Email Address</label>
                   <input
                     type="email"
+                    value={formEmail}
+                    onChange={(event) => setFormEmail(event.target.value)}
                     placeholder="john.doe@vango.com"
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
                   />
@@ -197,6 +302,8 @@ export function DriversManagementPage() {
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">License Number</label>
                   <input
                     type="text"
+                    value={formLicense}
+                    onChange={(event) => setFormLicense(event.target.value)}
                     placeholder="TX-000000"
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
                   />
@@ -205,7 +312,11 @@ export function DriversManagementPage() {
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">Assign Route</label>
                   <div className="relative">
-                    <select className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white">
+                    <select
+                      value={formRoute}
+                      onChange={(event) => setFormRoute(event.target.value)}
+                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
+                    >
                       <option value="">Select a route...</option>
                       <option>Northview Academy AM</option>
                       <option>West Side Shuttle</option>
@@ -219,20 +330,21 @@ export function DriversManagementPage() {
                   type="submit"
                   className="mt-2 w-full rounded-2xl bg-[#0B5394] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
                 >
-                  Create Driver Profile
+                  {formMode === "add" ? "Create Driver Profile" : "Update Driver"}
                 </button>
 
                 <button
                   type="button"
+                  onClick={() => setIsDrawerOpen(false)}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   Cancel
                 </button>
               </form>
             </div>
-          </aside>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

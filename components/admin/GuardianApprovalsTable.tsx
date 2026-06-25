@@ -1,9 +1,15 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/admin/DataTable";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { GUARDIAN_APPROVALS } from "@/lib/admin/constants";
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 export function GuardianApprovalsTable() {
   return (
@@ -27,13 +33,9 @@ export function GuardianApprovalsTable() {
             className="flex flex-col gap-3 rounded-lg border border-outline-variant/20 bg-surface-container-low p-3"
           >
             <div className="flex items-start gap-3">
-              <Image
-                src={guardian.avatar}
-                alt={guardian.name}
-                width={48}
-                height={48}
-                className="h-12 w-12 rounded-lg object-cover"
-              />
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-primary">
+                {getInitials(guardian.name)}
+              </span>
               <div className="flex-1">
                 <p className="font-bold text-foreground">{guardian.name}</p>
                 <p className="font-[family-name:var(--font-inter)] text-xs text-on-surface-variant">
@@ -65,13 +67,9 @@ export function GuardianApprovalsTable() {
               header: "Guardian",
               render: (row) => (
                 <div className="flex items-center gap-3">
-                  <Image
-                    src={row.avatar}
-                    alt={row.name}
-                    width={40}
-                    height={40}
-                    className="h-10 w-10 rounded-lg object-cover"
-                  />
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-fixed text-sm font-bold text-primary">
+                    {getInitials(row.name)}
+                  </span>
                   <div>
                     <p className="font-semibold text-foreground">{row.name}</p>
                     <p className="font-[family-name:var(--font-inter)] text-xs text-muted">

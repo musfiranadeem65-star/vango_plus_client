@@ -1,18 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { StepIndicator } from "@/components/ui/StepIndicator";
-import { ROLE_ROUTES } from "@/lib/auth/constants";
-import { saveAuthSession } from "@/lib/auth/storage";
-import type { RegisterFormData } from "@/lib/auth/types";
+import type { ParentSubscription, RegisterFormData } from "@/lib/auth/types";
+import {
+  formatPkr,
+  getPlanById,
+  SUBSCRIPTION_PLANS,
+} from "@/lib/subscription/plans";
 import {
   getPasswordStrength,
   validateConfirmPassword,
@@ -21,7 +24,7 @@ import {
   validateRequired,
 } from "@/lib/auth/validation";
 
-const STEPS = ["Info", "Setup", "Confirm"];
+const STEPS = ["Info", "Setup", "Plan", "Payment"];
 
 const CITIES = [
   "Lahore",
@@ -42,12 +45,21 @@ const initialForm: RegisterFormData = {
 };
 
 export default function RegisterPage() {
-  const router = useRouter();
+  const { register } = useAuth();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<RegisterFormData>(initialForm);
   const [errors, setErrors] = useState<Partial<Record<keyof RegisterFormData, string>>>({});
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | undefined>();
+  const [selectedPlanId, setSelectedPlanId] = useState("standard");
+  const [jazzCashNumber, setJazzCashNumber] = useState("");
+  const [jazzCashError, setJazzCashError] = useState<string | undefined>();
+
+  const selectedPlan = useMemo(
+    () => getPlanById(selectedPlanId),
+    [selectedPlanId]
+  );
 
   const passwordStrength = useMemo(
     () => getPasswordStrength(form.password),
@@ -90,25 +102,47 @@ export default function RegisterPage() {
 
   function handleNext() {
     if (!validateStep(step)) return;
-    setStep((prev) => Math.min(prev + 1, 3));
+    setStep((prev) => Math.min(prev + 1, 4));
   }
 
   function handleBack() {
     setStep((prev) => Math.max(prev - 1, 1));
   }
 
-  function handleSubmit(e: FormEvent) {
+  function validateJazzCash(): boolean {
+    const digits = jazzCashNumber.replace(/\D/g, "");
+    if (digits.length < 11) {
+      setJazzCashError("Enter a valid JazzCash mobile number.");
+      return false;
+    }
+    setJazzCashError(undefined);
+    return true;
+  }
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
-    if (!agreedToTerms) return;
+    if (!agreedToTerms || !selectedPlan) return;
+    if (!validateJazzCash()) return;
 
+    setFormError(undefined);
     setIsSubmitting(true);
-    saveAuthSession(
-      { email: form.email, role: "parent", name: form.fullName },
-      true
-    );
 
-    router.push(ROLE_ROUTES.parent);
+    const subscription: ParentSubscription = {
+      planId: selectedPlan.id,
+      planName: selectedPlan.name,
+      price: selectedPlan.price,
+      status: "active",
+      paymentMethod: "JazzCash",
+      startedAt: new Date().toISOString(),
+    };
+
+    const result = await register(form, subscription);
+
+    if (result.error) {
+      setFormError(result.error);
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -122,6 +156,15 @@ export default function RegisterPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        {formError && (
+          <div
+            role="alert"
+            className="rounded-lg border border-error/30 bg-error/5 px-4 py-3 text-sm text-error font-[family-name:var(--font-inter)]"
+          >
+            {formError}
+          </div>
+        )}
+
         {step === 1 && (
           <>
             <Input
@@ -204,36 +247,129 @@ export default function RegisterPage() {
         )}
 
         {step === 3 && (
-          <>
+          <div className="space-y-3">
+            <p className="text-sm text-muted font-[family-name:var(--font-inter)]">
+              Choose a subscription plan for your child&apos;s transport.
+            </p>
+            {SUBSCRIPTION_PLANS.map((plan) => {
+              const isSelected = plan.id === selectedPlanId;
+              return (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => setSelectedPlanId(plan.id)}
+                  className={`w-full rounded-xl border p-4 text-left transition ${
+                    isSelected
+                      ? "border-parent bg-parent/5 ring-2 ring-parent/20"
+                      : "border-border bg-white hover:border-parent/50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-bold text-foreground">
+                          {plan.name}
+                        </h3>
+                        {plan.recommended && (
+                          <span className="rounded-full bg-parent/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-parent">
+                            Popular
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted font-[family-name:var(--font-inter)]">
+                        {plan.tagline}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-foreground">
+                        {formatPkr(plan.price)}
+                      </p>
+                      <p className="text-[11px] text-muted font-[family-name:var(--font-inter)]">
+                        per {plan.period}
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="mt-3 space-y-1">
+                    {plan.features.map((feature) => (
+                      <li
+                        key={feature}
+                        className="flex items-center gap-2 text-xs text-foreground font-[family-name:var(--font-inter)]"
+                      >
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-parent" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {step === 4 && selectedPlan && (
+          <div className="space-y-5">
             <div className="rounded-xl border border-border bg-background p-5 space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Account Summary</h3>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Order Summary
+                </h3>
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
+                  onClick={() => setStep(3)}
                   className="text-xs font-medium text-parent hover:underline"
                 >
-                  Edit
+                  Change plan
                 </button>
               </div>
               <dl className="space-y-2 text-sm font-[family-name:var(--font-inter)]">
                 <div className="flex justify-between gap-4">
-                  <dt className="text-muted">Full Name</dt>
-                  <dd className="font-medium text-foreground text-right">{form.fullName}</dd>
+                  <dt className="text-muted">Plan</dt>
+                  <dd className="font-medium text-foreground text-right">
+                    {selectedPlan.name}
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-muted">Phone</dt>
-                  <dd className="font-medium text-foreground text-right">{form.phone}</dd>
+                  <dt className="text-muted">Billing</dt>
+                  <dd className="font-medium text-foreground text-right">
+                    Monthly
+                  </dd>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted">Email</dt>
-                  <dd className="font-medium text-foreground text-right">{form.email}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted">City</dt>
-                  <dd className="font-medium text-foreground text-right">{form.city}</dd>
+                <div className="flex justify-between gap-4 border-t border-border pt-2">
+                  <dt className="text-foreground font-semibold">
+                    Total due today
+                  </dt>
+                  <dd className="font-bold text-foreground text-right">
+                    {formatPkr(selectedPlan.price)}
+                  </dd>
                 </div>
               </dl>
+            </div>
+
+            <div className="rounded-xl border border-border p-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#9B1B6E] text-sm font-bold text-white">
+                  JC
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Pay with JazzCash
+                  </h3>
+                  <p className="text-xs text-muted font-[family-name:var(--font-inter)]">
+                    You&apos;ll receive a payment prompt on your mobile.
+                  </p>
+                </div>
+              </div>
+              <Input
+                label="JazzCash Mobile Number"
+                type="tel"
+                placeholder="03XX XXXXXXX"
+                value={jazzCashNumber}
+                onChange={(e) => {
+                  setJazzCashNumber(e.target.value);
+                  setJazzCashError(undefined);
+                }}
+                error={jazzCashError}
+              />
             </div>
 
             <Checkbox
@@ -241,7 +377,7 @@ export default function RegisterPage() {
               checked={agreedToTerms}
               onChange={(e) => setAgreedToTerms(e.target.checked)}
             />
-          </>
+          </div>
         )}
 
         <div className="flex gap-3 pt-2">
@@ -250,7 +386,7 @@ export default function RegisterPage() {
               Back
             </Button>
           )}
-          {step < 3 ? (
+          {step < 4 ? (
             <Button type="button" variant="parent" onClick={handleNext} className="flex-1">
               Next
             </Button>
@@ -261,7 +397,11 @@ export default function RegisterPage() {
               className="flex-1"
               disabled={!agreedToTerms || isSubmitting}
             >
-              {isSubmitting ? "Creating account..." : "Complete Registration"}
+              {isSubmitting
+                ? "Processing payment..."
+                : selectedPlan
+                  ? `Pay ${formatPkr(selectedPlan.price)} & Register`
+                  : "Complete Registration"}
             </Button>
           )}
         </div>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Icon } from "./Icon";
 
@@ -35,6 +36,7 @@ interface StatCardProps {
   label: string;
   tone?: StatTone;
   badge?: string;
+  href?: string;
   className?: string;
 }
 
@@ -44,20 +46,13 @@ export function StatCard({
   label,
   tone = "primary",
   badge,
+  href,
   className,
 }: StatCardProps) {
   const styles = toneStyles[tone];
 
-  return (
-    <div
-      className={cn(
-        "relative flex min-w-[140px] flex-col gap-1 rounded-xl border p-4 shadow-sm",
-        "snap-center transition-shadow hover:shadow-[var(--shadow-card-hover)]",
-        styles.container,
-        styles.border,
-        className
-      )}
-    >
+  const content = (
+    <>
       {badge && (
         <span className="absolute right-4 top-4 rounded bg-tertiary px-1.5 py-0.5 text-[10px] font-bold text-white">
           {badge}
@@ -70,6 +65,24 @@ export function StatCard({
       <span className="font-[family-name:var(--font-inter)] text-xs font-semibold uppercase tracking-wider">
         {label}
       </span>
-    </div>
+    </>
   );
+
+  const baseClassName = cn(
+    "relative flex min-w-[140px] flex-col gap-1 rounded-xl border p-4 shadow-sm",
+    "snap-center transition-shadow hover:shadow-[var(--shadow-card-hover)]",
+    styles.container,
+    styles.border,
+    className
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={baseClassName}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={baseClassName}>{content}</div>;
 }

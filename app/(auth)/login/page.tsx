@@ -1,26 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
-import { detectRoleFromEmail, ROLE_ROUTES } from "@/lib/auth/constants";
-import { saveAuthSession } from "@/lib/auth/storage";
+import { ROLE_LABELS } from "@/lib/auth/constants";
+import { DEMO_ACCOUNTS } from "@/lib/auth/mock-auth";
 import { validateEmail, validatePassword } from "@/lib/auth/validation";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [formError, setFormError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
     const emailError = validateEmail(email);
@@ -32,17 +33,36 @@ export default function LoginPage() {
     }
 
     setErrors({});
+    setFormError(undefined);
     setIsSubmitting(true);
 
-    const role = detectRoleFromEmail(email);
-    saveAuthSession({ email, role }, rememberMe);
+    const result = await login(email, password, rememberMe);
 
-    router.push(ROLE_ROUTES[role]);
+    if (result.error) {
+      setFormError(result.error);
+      setIsSubmitting(false);
+    }
+  }
+
+  function fillDemo(demoEmail: string, demoPassword: string) {
+    setEmail(demoEmail);
+    setPassword(demoPassword);
+    setErrors({});
+    setFormError(undefined);
   }
 
   return (
     <AuthCard title="Welcome back" subtitle="Sign in to your VanGo Plus account">
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        {formError && (
+          <div
+            role="alert"
+            className="rounded-lg border border-error/30 bg-error/5 px-4 py-3 text-sm text-error font-[family-name:var(--font-inter)]"
+          >
+            {formError}
+          </div>
+        )}
+
         <Input
           label="Email address"
           type="email"
@@ -88,10 +108,23 @@ export default function LoginPage() {
         </Link>
       </p>
 
-      <p className="mt-4 rounded-lg bg-primary/5 px-4 py-3 text-xs text-muted font-[family-name:var(--font-inter)]">
-        Demo tip: use an email with &quot;admin&quot;, &quot;driver&quot;, or anything else to
-        route to the admin, driver, or parent portal.
-      </p>
+      <div className="mt-6 rounded-lg bg-primary/5 px-4 py-3 font-[family-name:var(--font-inter)]">
+        <p className="text-xs font-medium text-foreground">
+          Demo accounts (password: password)
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {DEMO_ACCOUNTS.map((account) => (
+            <button
+              key={account.email}
+              type="button"
+              onClick={() => fillDemo(account.email, account.password)}
+              className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/5"
+            >
+              {ROLE_LABELS[account.role]}
+            </button>
+          ))}
+        </div>
+      </div>
     </AuthCard>
   );
 }

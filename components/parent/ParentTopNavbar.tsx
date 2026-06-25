@@ -1,20 +1,25 @@
 "use client";
 
+import { Menu } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { UserMenu } from "@/components/auth/UserMenu";
-import { Icon } from "@/components/admin/Icon";
+import { PARENT_PROFILE } from "@/lib/parent/constants";
 import { cn } from "@/lib/utils";
 
-interface AdminTopNavbarProps {
+interface ParentTopNavbarProps {
   onMenuClick?: () => void;
   title?: string;
   className?: string;
 }
 
-export function AdminTopNavbar({
+export function ParentTopNavbar({
   onMenuClick,
   title = "VanGo Plus",
   className,
-}: AdminTopNavbarProps) {
+}: ParentTopNavbarProps) {
+  const { user } = useAuth();
+  const displayName = user?.name ?? PARENT_PROFILE.name;
+
   return (
     <header
       className={cn(
@@ -31,33 +36,24 @@ export function AdminTopNavbar({
           className="rounded-full p-2 transition-transform hover:bg-surface-container-low active:scale-95 lg:hidden"
           aria-label="Open navigation menu"
         >
-          <Icon name="menu" className="text-secondary" size={22} />
+          <Menu className="text-secondary" size={22} />
         </button>
 
-        <div className="hidden min-w-0 lg:block">
+        <div className="min-w-0">
           <p className="truncate text-xl font-extrabold text-primary">{title}</p>
-        </div>
-
-        <div className="relative hidden max-w-md flex-1 md:block">
-          <Icon
-            name="search"
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-            size={20}
-          />
-          <input
-            type="search"
-            placeholder="Search students, routes, drivers..."
-            className={cn(
-              "h-10 w-full min-w-[240px] rounded-lg border border-outline-variant bg-surface-bright",
-              "pl-10 pr-4 text-sm outline-none transition-all",
-              "focus:border-primary focus:ring-2 focus:ring-primary/20"
-            )}
-          />
         </div>
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        <UserMenu />
+        <div className="flex items-center gap-3">
+          <div className="hidden text-right sm:block">
+            <p className="text-sm font-semibold leading-tight text-foreground">
+              {displayName}
+            </p>
+            <p className="text-xs text-on-surface-variant">Parent</p>
+          </div>
+          <UserMenu />
+        </div>
       </div>
     </header>
   );
