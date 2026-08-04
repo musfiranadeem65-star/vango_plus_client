@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronDown,
   GripVertical,
@@ -11,71 +11,100 @@ import {
   Users,
   X,
 } from "lucide-react";
+import type { Route, RouteStop } from "@/types/route";
+import {
+  createRoute,
+  createRouteStop,
+  deleteRoute,
+  deleteRouteStop,
+  getRoutes,
+  getStopsByRoute,
+  updateRoute,
+  updateRouteStatus,
+  updateRouteStop,
+} from "@/services/routeService";
 
-interface RouteCard {
-  id: number;
-  name: string;
-  status: "Active" | "Maintenance";
+interface RouteCard extends Route {
   driver: string;
   stops: number;
   students: number;
   accent: "blue" | "orange";
 }
 
-const seedRoutes: RouteCard[] = [
-  {
-    id: 1,
-    name: "North Loop Express",
-    status: "Active",
-    driver: "David Anderson",
-    stops: 12,
-    students: 24,
-    accent: "blue",
-  },
-  {
-    id: 2,
-    name: "West Side Shuttle",
-    status: "Maintenance",
-    driver: "Mina Patel",
-    stops: 8,
-    students: 16,
-    accent: "orange",
-  },
-];
-
 const statusStyles = {
   Active: "bg-emerald-50 text-emerald-700",
   Maintenance: "bg-amber-50 text-amber-700",
+  Inactive: "bg-slate-100 text-slate-600",
 };
 
-interface RouteStop {
-  id: number;
-  name: string;
-  time: string;
-}
-
-const defaultStops: RouteStop[] = [
-  { id: 1, name: "Maplewood Heights", time: "07:15 AM" },
-  { id: 2, name: "Riverside Court", time: "07:32 AM" },
-  { id: 3, name: "Lincoln Park", time: "07:48 AM" },
-];
+// Driver will be entered manually in the form (name + id)
 
 export function RoutesManagementPage() {
-  const [routes, setRoutes] = useState<RouteCard[]>(seedRoutes);
-  const [selectedRoute, setSelectedRoute] = useState<RouteCard | null>(seedRoutes[0]);
+  const [routes, setRoutes] = useState<RouteCard[]>([]);
+  const [selectedRoute, setSelectedRoute] = useState<RouteCard | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
   const [routeName, setRouteName] = useState("");
-  const [assignDriver, setAssignDriver] = useState("David Anderson");
-  const [stops, setStops] = useState<RouteStop[]>(defaultStops);
+  const [driverId, setDriverId] = useState<string>("");
+  const [driverName, setDriverName] = useState<string>("");
+  const [routeStatus, setRouteStatus] = useState<Route["status"]>("Active");
+  const [routeDescription, setRouteDescription] = useState("");
+  const [stops, setStops] = useState<RouteStop[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    async function loadRoutes() {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      try {
+        const data = await getRoutes();
+        const stopCounts = await Promise.all(
+          data.map(async (route) => {
+            try {
+              const stops = await getStopsByRoute(route.id);
+              return stops.length;
+            } catch {
+              return 0;
+            }
+          })
+        );
+
+        const mappedRoutes: RouteCard[] = data.map((route, index) => ({
+          ...route,
+          driver: `Driver ${route.driverId}`,
+          stops: stopCounts[index],
+          students: 0,
+          accent: index % 2 === 0 ? "blue" : "orange",
+        }));
+
+        setRoutes(mappedRoutes);
+        setSelectedRoute(mappedRoutes[0] ?? null);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Unable to load routes.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadRoutes();
+  }, []);
 
   function openAddRoute() {
     setFormMode("add");
     setEditingId(null);
     setRouteName("");
-    setAssignDriver("David Anderson");
+    setDriverId("");
+    setDriverName("");
+    setRouteStatus("Active");
+    setRouteDescription("");
     setStops([]);
+    setErrorMessage("");
     setIsFormOpen(true);
   }
 
@@ -84,62 +113,171 @@ export function RoutesManagementPage() {
     setEditingId(route.id);
     setSelectedRoute(route);
     setRouteName(route.name);
-    setAssignDriver(route.driver);
-    setStops(defaultStops);
+    setDriverId(String(route.driverId));
+    setDriverName(route.driver || `Driver ${route.driverId}`);
+    setRouteStatus(route.status);
+    setRouteDescription(route.description ?? "");
+    setErrorMessage("");
+    loadStops(route.id);
     setIsFormOpen(true);
   }
 
-  function handleSaveRoute() {
-    if (!routeName.trim()) return;
+  async function loadStops(routeId: number) {
+    try {
+      const routeStops = await getStopsByRoute(routeId);
+      setStops(routeStops.map((stop) => ({
+        ...stop,
+        arrivalTime: stop.arrivalTime,
+      })));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to load route stops.");
+      setStops([]);
+    }
+  }
 
-    const stopCount = stops.filter((stop) => stop.name.trim()).length;
-
-    if (formMode === "add") {
-      setRoutes((current) => [
-        ...current,
-        {
-          id: Date.now(),
-          name: routeName.trim(),
-          status: "Active",
-          driver: assignDriver,
-          stops: stopCount,
-          students: 0,
-          accent: "blue",
-        },
-      ]);
-    } else if (editingId !== null) {
-      setRoutes((current) =>
-        current.map((route) =>
-          route.id === editingId
-            ? {
-                ...route,
-                name: routeName.trim(),
-                driver: assignDriver,
-                stops: stopCount,
-              }
-            : route
-        )
-      );
+  async function handleSaveRoute() {
+    if (!routeName.trim()) {
+      setErrorMessage("Route name is required.");
+      return;
     }
 
-    setIsFormOpen(false);
+    if (Number(driverId) <= 0 || Number.isNaN(Number(driverId))) {
+      setErrorMessage("Driver ID (numeric) is required.");
+      return;
+    }
+
+    const payload = {
+      name: routeName.trim(),
+      status: routeStatus,
+      driverId: Number(driverId),
+      description: routeDescription,
+    };
+
+    setIsSaving(true);
+    setErrorMessage("");
+
+    let savedRouteId: number | null = editingId;
+
+    try {
+      if (formMode === "add") {
+        const created = await createRoute(payload);
+        savedRouteId = created.id;
+        const newRoute: RouteCard = {
+          ...created,
+          driver: driverName || `Driver ${created.driverId}`,
+          stops: stops.filter((stop) => stop.stopName.trim()).length,
+          students: 0,
+          accent: routes.length % 2 === 0 ? "blue" : "orange",
+        };
+        setRoutes((current) => [newRoute, ...current]);
+        setSelectedRoute(newRoute);
+      } else if (editingId !== null) {
+        await updateRoute(editingId, payload);
+        setRoutes((current) =>
+          current.map((route) =>
+                route.id === editingId
+              ? {
+                  ...route,
+                  ...payload,
+                  driver: driverName || route.driver,
+                  stops: stops.filter((stop) => stop.stopName.trim()).length,
+                }
+              : route
+          )
+        );
+      }
+
+      if (savedRouteId !== null) {
+        await Promise.all(
+          stops.map(async (stop) => {
+            if (!stop.stopName.trim()) return;
+
+            if (stop.id > 0 && stop.routeId === savedRouteId) {
+              await updateRouteStop(stop.id, {
+                ...stop,
+                routeId: savedRouteId,
+              });
+            } else {
+              await createRouteStop(savedRouteId, {
+                stopName: stop.stopName,
+                arrivalTime: stop.arrivalTime,
+                orderIndex: stop.orderIndex,
+              });
+            }
+          })
+        );
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to save route.");
+    } finally {
+      setIsSaving(false);
+      setIsFormOpen(false);
+    }
   }
 
   function addStop() {
     setStops((current) => [
       ...current,
-      { id: Date.now(), name: "", time: "" },
+      { id: Date.now(), routeId: editingId ?? 0, stopName: "", arrivalTime: "", orderIndex: current.length + 1 },
     ]);
   }
 
-  function removeStop(id: number) {
+  async function removeStop(id: number) {
+    const stopToDelete = stops.find((stop) => stop.id === id);
+
+    if (
+      editingId !== null &&
+      stopToDelete?.routeId === editingId &&
+      stopToDelete.id > 0
+    ) {
+      try {
+        await deleteRouteStop(id);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Unable to delete route stop.");
+      }
+    }
+
     setStops((current) => current.filter((stop) => stop.id !== id));
   }
 
-  function updateStop(id: number, field: "name" | "time", value: string) {
+  function updateStop(id: number, field: "stopName" | "arrivalTime", value: string) {
     setStops((current) =>
       current.map((stop) => (stop.id === id ? { ...stop, [field]: value } : stop))
     );
+  }
+
+  async function handleDeleteRoute(id: number) {
+    setDeletingId(id);
+    setErrorMessage("");
+
+    try {
+      await deleteRoute(id);
+      setRoutes((current) => {
+        const nextRoutes = current.filter((route) => route.id !== id);
+        if (selectedRoute?.id === id) {
+          setSelectedRoute(nextRoutes[0] ?? null);
+        }
+        return nextRoutes;
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to delete route.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleUpdateRouteStatus(id: number, status: Route["status"]) {
+    setStatusUpdatingId(id);
+    setErrorMessage("");
+
+    try {
+      await updateRouteStatus(id, status);
+      setRoutes((current) => current.map((route) => (route.id === id ? { ...route, status } : route)));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to update route status.");
+    } finally {
+      setStatusUpdatingId(null);
+    }
   }
 
   return (
@@ -163,75 +301,102 @@ export function RoutesManagementPage() {
         </header>
 
         <div className="px-3 py-4 sm:px-4 lg:px-5 lg:py-5">
+          {errorMessage ? (
+            <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {errorMessage}
+            </div>
+          ) : null}
           <div className="space-y-3">
-            {routes.map((route) => {
-              const active = selectedRoute?.id === route.id;
-              return (
-                <article
-                  key={route.id}
-                  onClick={() => setSelectedRoute(route)}
-                  className={`cursor-pointer rounded-[24px] border p-4 shadow-sm transition hover:shadow-md ${
-                    active ? "border-[#0B5394] bg-white" : "border-slate-200 bg-white"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-900">{route.name}</h3>
-                      <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[route.status]}`}>
-                        {route.status}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                      aria-label={`Open options for ${route.name}`}
-                    >
-                      <GripVertical size={18} />
-                    </button>
-                  </div>
-
-                  <div className="mt-4 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EAF6FF] text-[#0B5394]">
-                      <UserCircle2 size={18} />
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Driver</p>
-                      <p className="text-sm font-semibold text-slate-700">{route.driver}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2.5">
-                      <MapPin size={16} className="text-slate-500" />
+            {isLoading ? (
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">
+                Loading routes...
+              </div>
+            ) : (
+              routes.map((route) => {
+                const active = selectedRoute?.id === route.id;
+                return (
+                  <article
+                    key={route.id}
+                    onClick={() => setSelectedRoute(route)}
+                    className={`cursor-pointer rounded-[24px] border p-4 shadow-sm transition hover:shadow-md ${
+                      active ? "border-[#0B5394] bg-white" : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Stops</p>
-                        <p className="text-sm font-semibold text-slate-700">{route.stops}</p>
+                        <h3 className="text-base font-semibold text-slate-900">{route.name}</h3>
+                        <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[route.status]}`}>
+                          {route.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={route.status}
+                          onChange={(event) => handleUpdateRouteStatus(route.id, event.target.value as Route["status"])}
+                          disabled={statusUpdatingId === route.id}
+                          className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition disabled:opacity-50"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                          <option value="Maintenance">Maintenance</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteRoute(route.id);
+                          }}
+                          disabled={deletingId === route.id}
+                          className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2.5">
-                      <Users size={16} className="text-slate-500" />
+
+                    <div className="mt-4 flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EAF6FF] text-[#0B5394]">
+                        <UserCircle2 size={18} />
+                      </div>
                       <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Students</p>
-                        <p className="text-sm font-semibold text-slate-700">{route.students}</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Driver</p>
+                        <p className="text-sm font-semibold text-slate-700">{route.driver}</p>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openEditRoute(route);
-                      }}
-                      className="w-full rounded-2xl bg-[#0B5394] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2.5">
+                        <MapPin size={16} className="text-slate-500" />
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Stops</p>
+                          <p className="text-sm font-semibold text-slate-700">{route.stops}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2.5">
+                        <Users size={16} className="text-slate-500" />
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Students</p>
+                          <p className="text-sm font-semibold text-slate-700">{route.students}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openEditRoute(route);
+                        }}
+                        className="w-full rounded-2xl bg-[#0B5394] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  </article>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
@@ -278,19 +443,51 @@ export function RoutesManagementPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Assign Driver</label>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Driver Name</label>
+                  <input
+                    value={driverName}
+                    onChange={(event) => setDriverName(event.target.value)}
+                    placeholder="e.g. David Anderson"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Driver ID</label>
+                  <input
+                    value={driverId}
+                    onChange={(event) => setDriverId(event.target.value)}
+                    type="text"
+                    placeholder="Enter driver id number"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Status</label>
                   <div className="relative">
                     <select
-                      value={assignDriver}
-                      onChange={(event) => setAssignDriver(event.target.value)}
+                      value={routeStatus}
+                      onChange={(event) => setRouteStatus(event.target.value as Route["status"])}
                       className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
                     >
-                      <option>David Anderson</option>
-                      <option>Mina Patel</option>
-                      <option>Peter Brooks</option>
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                      <option value="Maintenance">Maintenance</option>
                     </select>
                     <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Description</label>
+                  <textarea
+                    value={routeDescription}
+                    onChange={(event) => setRouteDescription(event.target.value)}
+                    rows={3}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
+                    placeholder="Route details or notes"
+                  />
                 </div>
 
                 <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-3">
@@ -319,14 +516,14 @@ export function RoutesManagementPage() {
                           </div>
                           <div className="min-w-0 flex-1 space-y-1.5">
                             <input
-                              value={stop.name}
-                              onChange={(event) => updateStop(stop.id, "name", event.target.value)}
+                              value={stop.stopName}
+                              onChange={(event) => updateStop(stop.id, "stopName", event.target.value)}
                               placeholder="Stop name"
                               className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#0B5394] focus:bg-white"
                             />
                             <input
-                              value={stop.time}
-                              onChange={(event) => updateStop(stop.id, "time", event.target.value)}
+                              value={stop.arrivalTime}
+                              onChange={(event) => updateStop(stop.id, "arrivalTime", event.target.value)}
                               placeholder="ETA (e.g. 07:15 AM)"
                               className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-500 outline-none transition focus:border-[#0B5394] focus:bg-white"
                             />
@@ -357,9 +554,10 @@ export function RoutesManagementPage() {
                 <button
                   type="button"
                   onClick={handleSaveRoute}
-                  className="rounded-2xl bg-[#0B5394] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
+                  disabled={isSaving}
+                  className="rounded-2xl bg-[#0B5394] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#084c7a] disabled:opacity-50"
                 >
-                  Save Route
+                  {isSaving ? "Saving..." : "Save Route"}
                 </button>
               </div>
             </div>

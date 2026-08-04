@@ -1,51 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   ChevronDown,
   PencilLine,
   Plus,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
+import type { Driver } from "@/types/driver";
+import {
+  createDriver,
+  deleteDriver,
+  getDrivers,
+  updateDriver,
+  updateDriverStatus,
+} from "@/services/driverService";
 
-interface DriverCard {
-  id: number;
-  name: string;
-  status: "Active" | "Inactive";
-  phone: string;
-  email: string;
-  license: string;
+interface DriverCard extends Driver {
   route: string;
   routeLabel: string;
   initials: string;
 }
-
-const seedDrivers: DriverCard[] = [
-  {
-    id: 1,
-    name: "David Anderson",
-    status: "Active",
-    phone: "+1 (555) 010-4821",
-    email: "david.anderson@vango.com",
-    license: "TX-482149",
-    route: "Northview Academy AM",
-    routeLabel: "Assigned Route",
-    initials: "DA",
-  },
-  {
-    id: 2,
-    name: "Mina Patel",
-    status: "Inactive",
-    phone: "+1 (555) 014-7712",
-    email: "mina.patel@vango.com",
-    license: "TX-881204",
-    route: "No route history",
-    routeLabel: "Unassigned",
-    initials: "MP",
-  },
-];
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -55,7 +33,7 @@ function getInitials(name: string): string {
 }
 
 export function DriversManagementPage() {
-  const [drivers, setDrivers] = useState<DriverCard[]>(seedDrivers);
+  const [drivers, setDrivers] = useState<DriverCard[]>([]);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -65,9 +43,15 @@ export function DriversManagementPage() {
   const [formEmail, setFormEmail] = useState("");
   const [formLicense, setFormLicense] = useState("");
   const [formRoute, setFormRoute] = useState("");
+  const [formStatus, setFormStatus] = useState<Driver["status"]>("Active");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const filteredDrivers = drivers.filter((driver) =>
-    [driver.name, driver.phone, driver.license, driver.route]
+    [driver.name, driver.phone, driver.licenseNo, driver.route]
       .join(" ")
       .toLowerCase()
       .includes(searchText.toLowerCase())
@@ -81,8 +65,34 @@ export function DriversManagementPage() {
     setFormEmail("");
     setFormLicense("");
     setFormRoute("");
+    setFormStatus("Active");
     setIsDrawerOpen(true);
   }
+
+  useEffect(() => {
+    async function loadDrivers() {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      try {
+        const data = await getDrivers();
+        setDrivers(
+          data.map((driver) => ({
+            ...driver,
+            route: "No route history",
+            routeLabel: "Unassigned",
+            initials: getInitials(driver.name),
+          }))
+        );
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Unable to load drivers.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadDrivers();
+  }, []);
 
   function openEditDriver(driver: DriverCard) {
     setFormMode("edit");
@@ -90,54 +100,98 @@ export function DriversManagementPage() {
     setFormName(driver.name);
     setFormPhone(driver.phone);
     setFormEmail(driver.email);
-    setFormLicense(driver.license);
+    setFormLicense(driver.licenseNo);
     setFormRoute(driver.routeLabel === "Unassigned" ? "" : driver.route);
+    setFormStatus(driver.status);
     setIsDrawerOpen(true);
   }
 
-  function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!formName.trim()) return;
+    if (!formName.trim() || !formLicense.trim() || !formStatus.trim()) return;
 
     const hasRoute = Boolean(formRoute);
     const route = hasRoute ? formRoute : "No route history";
     const routeLabel = hasRoute ? "Assigned Route" : "Unassigned";
+    const payload = {
+      name: formName.trim(),
+      phone: formPhone || "",
+      email: formEmail || "",
+      licenseNo: formLicense.trim(),
+      status: formStatus,
+    };
 
-    if (formMode === "add") {
-      setDrivers((current) => [
-        {
-          id: Date.now(),
-          name: formName.trim(),
-          status: "Active",
-          phone: formPhone || "—",
-          email: formEmail,
-          license: formLicense || "—",
-          route,
-          routeLabel,
-          initials: getInitials(formName),
-        },
-        ...current,
-      ]);
-    } else if (editingId !== null) {
+    setIsSaving(true);
+    setErrorMessage("");
+
+    try {
+      if (formMode === "add") {
+        const created = await createDriver(payload);
+        setDrivers((current) => [
+          {
+            ...created,
+            route,
+            routeLabel,
+            initials: getInitials(created.name),
+          },
+          ...current,
+        ]);
+      } else if (editingId !== null) {
+        await updateDriver(editingId, payload);
+        setDrivers((current) =>
+          current.map((driver) =>
+            driver.id === editingId
+              ? {
+                  ...driver,
+                  ...payload,
+                  licenseNo: payload.licenseNo,
+                  route,
+                  routeLabel,
+                  initials: getInitials(payload.name),
+                }
+              : driver
+          )
+        );
+      }
+
+      setIsDrawerOpen(false);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to save driver.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteDriver(id: number) {
+    setDeletingId(id);
+    setErrorMessage("");
+
+    try {
+      await deleteDriver(id);
+      setDrivers((current) => current.filter((driver) => driver.id !== id));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to delete driver.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleStatusChange(id: number, status: Driver["status"]) {
+    setStatusUpdatingId(id);
+    setErrorMessage("");
+
+    try {
+      await updateDriverStatus(id, status);
       setDrivers((current) =>
         current.map((driver) =>
-          driver.id === editingId
-            ? {
-                ...driver,
-                name: formName.trim(),
-                phone: formPhone || driver.phone,
-                email: formEmail,
-                license: formLicense || driver.license,
-                route,
-                routeLabel,
-                initials: getInitials(formName),
-              }
-            : driver
+          driver.id === id ? { ...driver, status } : driver
         )
       );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to update driver status.");
+    } finally {
+      setStatusUpdatingId(null);
     }
-
-    setIsDrawerOpen(false);
   }
 
   return (
@@ -172,8 +226,22 @@ export function DriversManagementPage() {
         </header>
 
         <div className="flex flex-col gap-6 px-3 py-4 sm:px-4 lg:px-5 lg:py-5">
+          {errorMessage ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+              {errorMessage}
+            </div>
+          ) : null}
           <section className="flex-1 space-y-3">
-            {filteredDrivers.map((driver) => (
+            {isLoading ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">
+                Loading drivers...
+              </div>
+            ) : filteredDrivers.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">
+                No drivers found.
+              </div>
+            ) : (
+              filteredDrivers.map((driver) => (
               <article key={driver.id} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
@@ -183,7 +251,7 @@ export function DriversManagementPage() {
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-base font-semibold text-slate-900">{driver.name}</h3>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${driver.status === "Active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${driver.status === "Active" ? "bg-emerald-50 text-emerald-700" : driver.status === "Inactive" ? "bg-slate-100 text-slate-600" : "bg-amber-50 text-amber-700"}`}>
                           {driver.status}
                         </span>
                       </div>
@@ -199,6 +267,15 @@ export function DriversManagementPage() {
                       aria-label={`Edit ${driver.name}`}
                     >
                       <PencilLine size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDriver(driver.id)}
+                      disabled={deletingId === driver.id}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100 disabled:opacity-50"
+                      aria-label={`Delete ${driver.name}`}
+                    >
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
@@ -225,15 +302,31 @@ export function DriversManagementPage() {
                         <p className="text-sm font-semibold text-[#0B5394]">{driver.route}</p>
                       </div>
                     </div>
-                    {driver.status === "Inactive" ? (
-                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-                        Unassigned
-                      </span>
-                    ) : null}
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={driver.status}
+                        onChange={(event) => handleStatusChange(driver.id, event.target.value as Driver["status"])}
+                        disabled={statusUpdatingId === driver.id}
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="On Leave">On Leave</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDriver(driver.id)}
+                        disabled={deletingId === driver.id}
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               </article>
-            ))}
+                ))
+              )}
           </section>
         </div>
       </div>
@@ -326,11 +419,31 @@ export function DriversManagementPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Status</label>
+                  <select
+                    value={formStatus}
+                    onChange={(event) => setFormStatus(event.target.value as Driver["status"])}
+                    className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="On Leave">On Leave</option>
+                  </select>
+                </div>
+
+                {errorMessage ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {errorMessage}
+                  </div>
+                ) : null}
+
                 <button
                   type="submit"
-                  className="mt-2 w-full rounded-2xl bg-[#0B5394] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#084c7a]"
+                  disabled={isSaving}
+                  className="mt-2 w-full rounded-2xl bg-[#0B5394] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#084c7a] disabled:opacity-50"
                 >
-                  {formMode === "add" ? "Create Driver Profile" : "Update Driver"}
+                  {isSaving ? "Saving..." : formMode === "add" ? "Create Driver Profile" : "Update Driver"}
                 </button>
 
                 <button

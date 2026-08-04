@@ -1,15 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   PencilLine,
   Plus,
-  Power,
   Search,
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import { getStudents, updateStudent } from "@/services/studentService";
 
 interface StudentRecord {
   id: number;
@@ -17,53 +17,12 @@ interface StudentRecord {
   grade: string;
   section: string;
   parent: string;
+  parentUserId: number;
   route: string;
   status: "Active" | "Inactive";
   initials: string;
 }
 
-const seedStudents: StudentRecord[] = [
-  {
-    id: 1,
-    name: "Ava Thompson",
-    grade: "Grade 4",
-    section: "Class B",
-    parent: "Maya Thompson",
-    route: "North Loop",
-    status: "Active",
-    initials: "AT",
-  },
-  {
-    id: 2,
-    name: "Noah Bennett",
-    grade: "Grade 5",
-    section: "Class A",
-    parent: "Liam Bennett",
-    route: "West Ridge",
-    status: "Active",
-    initials: "NB",
-  },
-  {
-    id: 3,
-    name: "Sophia Carter",
-    grade: "Grade 3",
-    section: "Class C",
-    parent: "Claire Carter",
-    route: "Unassigned",
-    status: "Inactive",
-    initials: "SC",
-  },
-  {
-    id: 4,
-    name: "Liam Ortiz",
-    grade: "Grade 6",
-    section: "Class B",
-    parent: "Daniel Ortiz",
-    route: "Harbor View",
-    status: "Active",
-    initials: "LO",
-  },
-];
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -73,7 +32,10 @@ function getInitials(name: string): string {
 }
 
 export function StudentsManagementPage() {
-  const [students, setStudents] = useState<StudentRecord[]>(seedStudents);
+  const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -84,6 +46,9 @@ export function StudentsManagementPage() {
   const [formRoute, setFormRoute] = useState("");
   const [filter, setFilter] = useState("All Students");
   const [searchText, setSearchText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const filteredStudents = useMemo(() => {
     return students.filter((student) => {
@@ -109,6 +74,9 @@ export function StudentsManagementPage() {
     setFormSection("");
     setFormParent("");
     setFormRoute("");
+    setIsSubmitting(false);
+    setSubmitMessage(null);
+    setSubmitError(null);
     setIsDrawerOpen(true);
   }
 
@@ -120,55 +88,226 @@ export function StudentsManagementPage() {
     setFormSection(student.section);
     setFormParent(student.parent);
     setFormRoute(student.route);
+    setIsSubmitting(false);
+    setSubmitMessage(null);
+    setSubmitError(null);
     setIsDrawerOpen(true);
   }
 
-  function toggleStatus(id: number) {
-    setStudents((current) =>
-      current.map((student) =>
-        student.id === id
-          ? { ...student, status: student.status === "Active" ? "Inactive" : "Active" }
-          : student
-      )
-    );
+  useEffect(() => {
+    let active = true;
+
+    async function loadStudents() {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+
+        const result = await getStudents();
+        if (!active) return;
+
+        setStudents(
+          result.map((student) => ({
+            id: student.id,
+            name: student.name,
+            grade: student.grade,
+            section: student.section,
+            parent: student.parentUserId.toString(),
+            parentUserId: student.parentUserId,
+            route: "Unassigned",
+            status: (student.status === "Active" ? "Active" : "Inactive"),
+            initials: getInitials(student.name),
+          }))
+        );
+      } catch (error) {
+        if (!active) return;
+        setLoadError(error instanceof Error ? error.message : "Unable to load students.");
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadStudents();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function refreshStudentList() {
+    try {
+      setIsLoading(true);
+      setLoadError(null);
+      const result = await getStudents();
+      setStudents(
+        result.map((student) => ({
+          id: student.id,
+          name: student.name,
+          grade: student.grade,
+          section: student.section,
+          parent: student.parentUserId.toString(),
+          parentUserId: student.parentUserId,
+          route: "Unassigned",
+          status: student.status === "Active" ? "Active" : "Inactive",
+          initials: getInitials(student.name),
+        }))
+      );
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load students.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!formName.trim()) return;
+  async function toggleStatus(id: number) {
+    const student = students.find((item) => item.id === id);
+    if (!student) return;
 
-    const route = formRoute || "Unassigned";
+    const previousStatus = student.status;
+    const nextStatus = previousStatus === "Active" ? "Inactive" : "Active";
+    setStatusUpdatingId(id);
+    setSubmitError(null);
+    setSubmitMessage(null);
+    setStudents((current) =>
+      current.map((item) => (item.id === id ? { ...item, status: nextStatus } : item))
+    );
+
+    try {
+      await updateStudent(id, {
+        parentUserId: student.parentUserId,
+        name: student.name,
+        grade: student.grade,
+        section: student.section,
+        status: nextStatus,
+      });
+
+      await refreshStudentList();
+      setSubmitMessage("Student status updated successfully.");
+    } catch (error) {
+      setStudents((current) =>
+        current.map((item) => (item.id === id ? { ...item, status: previousStatus } : item))
+      );
+      setSubmitError(error instanceof Error ? error.message : "Failed to update student status.");
+    } finally {
+      setStatusUpdatingId(null);
+    }
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+
+    if (!formName.trim()) {
+      setSubmitError("Student name is required.");
+      return;
+    }
 
     if (formMode === "add") {
-      setStudents((current) => [
-        {
-          id: Date.now(),
+      setIsSubmitting(true);
+      setSubmitError(null);
+      setSubmitMessage(null);
+
+      const parentUserId = Number(formParent) > 0 ? Number(formParent) : 1;
+      const route = formRoute || "Unassigned";
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+    
+        const response = await fetch("https://localhost:7270/api/Student", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            parentUserId,
+            name: formName.trim(),
+            grade: formGrade || "—",
+            section: formSection || "—",
+            status: "Active",
+          }),
+          signal: controller.signal,
+        });
+        window.clearTimeout(timeoutId);
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(data?.message || `Request failed with status ${response.status}`);
+        }
+
+        setStudents((current) => [
+          {
+            id: data?.id ?? Date.now(),
+            name: data?.name ?? formName.trim(),
+            grade: (data?.grade ?? formGrade) || "—",
+            section: (data?.section ?? formSection) || "—",
+            parent: formParent || "—",
+            parentUserId,
+            route,
+            status: (data?.status as StudentRecord["status"]) || "Active",
+            initials: getInitials(data?.name ?? formName.trim()),
+          },
+          ...current,
+        ]);
+
+        setSubmitMessage("Student created successfully.");
+        setIsDrawerOpen(false);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          setSubmitError("The request timed out. Please try again.");
+        } else {
+          setSubmitError(error instanceof Error ? error.message : "Failed to create student.");
+        }
+      } finally {
+        setIsSubmitting(false);
+      }
+
+      return;
+    }
+
+    if (editingId !== null) {
+      setIsSubmitting(true);
+      setSubmitError(null);
+      setSubmitMessage(null);
+
+      const parentUserId = Number(formParent) > 0 ? Number(formParent) : 1;
+      const route = formRoute || "Unassigned";
+      const existingStatus = students.find((student) => student.id === editingId)?.status || "Active";
+
+      try {
+        await updateStudent(editingId, {
+          parentUserId,
           name: formName.trim(),
           grade: formGrade || "—",
           section: formSection || "—",
-          parent: formParent || "—",
-          route,
-          status: "Active",
-          initials: getInitials(formName),
-        },
-        ...current,
-      ]);
-    } else if (editingId !== null) {
-      setStudents((current) =>
-        current.map((student) =>
-          student.id === editingId
-            ? {
-                ...student,
-                name: formName.trim(),
-                grade: formGrade || student.grade,
-                section: formSection || student.section,
-                parent: formParent || student.parent,
-                route,
-                initials: getInitials(formName),
-              }
-            : student
-        )
-      );
+          status: existingStatus,
+        });
+
+        setStudents((current) =>
+          current.map((student) =>
+            student.id === editingId
+              ? {
+                  ...student,
+                  name: formName.trim(),
+                  grade: formGrade || student.grade,
+                  section: formSection || student.section,
+                  parent: formParent || student.parent,
+                  parentUserId,
+                  route,
+                  initials: getInitials(formName),
+                }
+              : student
+          )
+        );
+
+        setSubmitMessage("Student updated successfully.");
+        setIsDrawerOpen(false);
+      } catch (error) {
+        setSubmitError(error instanceof Error ? error.message : "Failed to update student.");
+      } finally {
+        setIsSubmitting(false);
+      }
     }
 
     setIsDrawerOpen(false);
@@ -187,6 +326,18 @@ export function StudentsManagementPage() {
                 <h1 className="text-2xl font-bold text-[#0f2c4b]">Students</h1>
                 <p className="text-sm text-slate-500">Keep transport records tidy and up to date.</p>
               </div>
+
+              {submitMessage ? (
+                <p className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700">
+                  {submitMessage}
+                </p>
+              ) : null}
+
+              {submitError ? (
+                <p className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-700">
+                  {submitError}
+                </p>
+              ) : null}
 
               <button
                 type="button"
@@ -236,71 +387,82 @@ export function StudentsManagementPage() {
           </div>
 
           <div className="max-h-[calc(100vh-24rem)] space-y-3 overflow-y-auto p-3 sm:p-4 lg:max-h-[calc(100vh-20rem)] lg:p-5">
-            {filteredStudents.map((student) => (
-              <article
-                key={student.id}
-                className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#eaf5ff] text-sm font-semibold text-[#005691]">
-                      {student.initials}
+            {isLoading ? (
+              <div className="rounded-[20px] border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                Loading students...
+              </div>
+            ) : loadError ? (
+              <div className="rounded-[20px] border border-rose-200 bg-rose-50 p-8 text-center text-sm font-medium text-rose-700">
+                {loadError}
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="rounded-[20px] border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+                No students found.
+              </div>
+            ) : (
+              filteredStudents.map((student, index) => (
+                <article
+                  key={`${student.id}-${index}`}
+                  className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#eaf5ff] text-sm font-semibold text-[#005691]">
+                        {student.initials}
+                      </div>
+
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="text-base font-semibold text-slate-900">{student.name}</h2>
+                          <span className="text-sm text-slate-500">{student.grade} • {student.section}</span>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                              Parent
+                            </p>
+                            <p className="text-sm font-medium text-slate-700">{student.parent}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                              Route
+                            </p>
+                            <p className="text-sm font-medium text-slate-700">{student.route}</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="min-w-0 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-base font-semibold text-slate-900">{student.name}</h2>
-                        <span className="text-sm text-slate-500">{student.grade} • {student.section}</span>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                            Parent
-                          </p>
-                          <p className="text-sm font-medium text-slate-700">{student.parent}</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                            Route
-                          </p>
-                          <p className="text-sm font-medium text-slate-700">{student.route}</p>
-                        </div>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                        Status
+                      </label>
+                      <select
+                        value={student.status}
+                        onChange={() => toggleStatus(student.id)}
+                        disabled={statusUpdatingId === student.id}
+                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 outline-none transition focus:border-[#005691] focus:bg-white"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
                     </div>
                   </div>
 
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      student.status === "Active"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {student.status}
-                  </span>
-                </div>
-
-                <div className="mt-4 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openEditStudent(student)}
-                    className="rounded-full border border-sky-100 bg-sky-50 p-2 text-sky-700 transition hover:bg-sky-100"
-                    aria-label={`Edit ${student.name}`}
-                  >
-                    <PencilLine size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleStatus(student.id)}
-                    className="rounded-full border border-sky-100 bg-sky-50 p-2 text-sky-700 transition hover:bg-sky-100"
-                    aria-label={`Toggle ${student.name}`}
-                  >
-                    <Power size={16} />
-                  </button>
-                </div>
-              </article>
-            ))}
+                  <div className="mt-4 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditStudent(student)}
+                      className="rounded-full border border-sky-100 bg-sky-50 p-2 text-sky-700 transition hover:bg-sky-100"
+                      aria-label={`Edit ${student.name}`}
+                    >
+                      <PencilLine size={16} />
+                    </button>
+                  </div>
+                </article>
+              ))
+            )}
           </div>
         </section>
       </div>
@@ -404,11 +566,28 @@ export function StudentsManagementPage() {
                   </div>
                 </div>
 
+                {submitError ? (
+                  <p className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+                    {submitError}
+                  </p>
+                ) : null}
+
+                {submitMessage && formMode === "add" ? (
+                  <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+                    {submitMessage}
+                  </p>
+                ) : null}
+
                 <button
                   type="submit"
-                  className="mt-2 w-full rounded-2xl bg-[#005691] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#004a7a]"
+                  disabled={isSubmitting}
+                  className="mt-2 w-full rounded-2xl bg-[#005691] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#004a7a] disabled:cursor-not-allowed disabled:bg-slate-400"
                 >
-                  {formMode === "add" ? "Save Student Profile" : "Update Student"}
+                  {isSubmitting
+                    ? "Creating Student..."
+                    : formMode === "add"
+                      ? "Save Student Profile"
+                      : "Update Student"}
                 </button>
 
                 <button
