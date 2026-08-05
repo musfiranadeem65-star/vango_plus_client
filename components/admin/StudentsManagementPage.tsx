@@ -9,6 +9,8 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import type { Guardian } from "@/types/guardian";
+import { getGuardians } from "@/services/guardianService";
 import { getStudents, updateStudent } from "@/services/studentService";
 
 interface StudentRecord {
@@ -43,6 +45,12 @@ export function StudentsManagementPage() {
   const [formGrade, setFormGrade] = useState("");
   const [formSection, setFormSection] = useState("");
   const [formParent, setFormParent] = useState("");
+  const [selectedGuardian, setSelectedGuardian] = useState<Guardian | null>(null);
+  const [guardianSearch, setGuardianSearch] = useState("");
+  const [guardians, setGuardians] = useState<Guardian[]>([]);
+  const [guardianLoading, setGuardianLoading] = useState(false);
+  const [guardianError, setGuardianError] = useState<string | null>(null);
+  const [guardianDropdownOpen, setGuardianDropdownOpen] = useState(false);
   const [formRoute, setFormRoute] = useState("");
   const [filter, setFilter] = useState("All Students");
   const [searchText, setSearchText] = useState("");
@@ -73,6 +81,8 @@ export function StudentsManagementPage() {
     setFormGrade("");
     setFormSection("");
     setFormParent("");
+    setSelectedGuardian(null);
+    setGuardianSearch("");
     setFormRoute("");
     setIsSubmitting(false);
     setSubmitMessage(null);
@@ -88,6 +98,8 @@ export function StudentsManagementPage() {
     setFormSection(student.section);
     setFormParent(student.parent);
     setFormRoute(student.route);
+    setSelectedGuardian(guardians.find((guardian) => guardian.userId === student.parentUserId) ?? null);
+    setGuardianSearch(student.parent);
     setIsSubmitting(false);
     setSubmitMessage(null);
     setSubmitError(null);
@@ -96,6 +108,27 @@ export function StudentsManagementPage() {
 
   useEffect(() => {
     let active = true;
+
+    async function loadGuardians() {
+      try {
+        setGuardianLoading(true);
+        setGuardianError(null);
+
+        const result = await getGuardians();
+        if (!active) return;
+
+        setGuardians(result.filter((guardian) => guardian.status === "Approved"));
+      } catch (error) {
+        if (!active) return;
+        setGuardianError(error instanceof Error ? error.message : "Unable to load guardians.");
+      } finally {
+        if (active) {
+          setGuardianLoading(false);
+        }
+      }
+    }
+
+    loadGuardians();
 
     async function loadStudents() {
       try {
@@ -134,6 +167,14 @@ export function StudentsManagementPage() {
       active = false;
     };
   }, []);
+
+  const filteredGuardians = useMemo(
+    () =>
+      guardians.filter((guardian) =>
+        guardian.name.toLowerCase().includes(guardianSearch.toLowerCase())
+      ),
+    [guardians, guardianSearch]
+  );
 
   async function refreshStudentList() {
     try {
@@ -202,13 +243,19 @@ export function StudentsManagementPage() {
       return;
     }
 
+    const route = formRoute || "Unassigned";
+
     if (formMode === "add") {
+      if (!selectedGuardian) {
+        setSubmitError("Please select a parent or guardian.");
+        return;
+      }
+
       setIsSubmitting(true);
       setSubmitError(null);
       setSubmitMessage(null);
 
-      const parentUserId = Number(formParent) > 0 ? Number(formParent) : 1;
-      const route = formRoute || "Unassigned";
+      const parentUserId = selectedGuardian.userId;
 
       try {
         const controller = new AbortController();
@@ -242,7 +289,7 @@ export function StudentsManagementPage() {
             name: data?.name ?? formName.trim(),
             grade: (data?.grade ?? formGrade) || "—",
             section: (data?.section ?? formSection) || "—",
-            parent: formParent || "—",
+            parent: (selectedGuardian?.name ?? formParent) || "—",
             parentUserId,
             route,
             status: (data?.status as StudentRecord["status"]) || "Active",
@@ -271,9 +318,17 @@ export function StudentsManagementPage() {
       setSubmitError(null);
       setSubmitMessage(null);
 
-      const parentUserId = Number(formParent) > 0 ? Number(formParent) : 1;
-      const route = formRoute || "Unassigned";
       const existingStatus = students.find((student) => student.id === editingId)?.status || "Active";
+      const parentUserId = selectedGuardian
+        ? selectedGuardian.userId
+        : students.find((student) => student.id === editingId)?.parentUserId;
+
+      if (!parentUserId) {
+        setSubmitError("Please select a parent or guardian.");
+        setIsSubmitting(false);
+        return;
+      }
+      const route = formRoute || "Unassigned";
 
       try {
         await updateStudent(editingId, {
@@ -292,7 +347,7 @@ export function StudentsManagementPage() {
                   name: formName.trim(),
                   grade: formGrade || student.grade,
                   section: formSection || student.section,
-                  parent: formParent || student.parent,
+                  parent: selectedGuardian?.name || formParent || student.parent,
                   parentUserId,
                   route,
                   initials: getInitials(formName),
@@ -534,18 +589,55 @@ export function StudentsManagementPage() {
                   />
                 </div>
 
-                <div>
+                <div className="relative">
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">Parent / Guardian</label>
                   <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus-within:border-[#005691] focus-within:bg-white">
                     <Search size={16} className="text-slate-400" />
                     <input
                       type="text"
                       value={formParent}
-                      onChange={(event) => setFormParent(event.target.value)}
-                      placeholder="Search by name or ID"
+                      onChange={(event) => {
+                        setFormParent(event.target.value);
+                        setGuardianSearch(event.target.value);
+                        if (selectedGuardian && event.target.value !== selectedGuardian.name) {
+                          setSelectedGuardian(null);
+                        }
+                        setGuardianDropdownOpen(true);
+                      }}
+                      onFocus={() => setGuardianDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setGuardianDropdownOpen(false), 150)}
+                      placeholder="Search by name"
                       className="w-full bg-transparent outline-none placeholder:text-slate-400"
                     />
                   </label>
+
+                  {guardianDropdownOpen ? (
+                    <div className="absolute left-0 right-0 z-10 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-lg">
+                      {guardianLoading ? (
+                        <div className="px-4 py-3 text-sm text-slate-500">Loading guardians...</div>
+                      ) : guardianError ? (
+                        <div className="px-4 py-3 text-sm text-rose-600">{guardianError}</div>
+                      ) : filteredGuardians.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-slate-500">No approved guardians found.</div>
+                      ) : (
+                        filteredGuardians.map((guardian) => (
+                          <button
+                            key={guardian.userId}
+                            type="button"
+                            onMouseDown={() => {
+                              setSelectedGuardian(guardian);
+                              setFormParent(guardian.name);
+                              setGuardianSearch(guardian.name);
+                              setGuardianDropdownOpen(false);
+                            }}
+                            className="w-full px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                          >
+                            {guardian.name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div>
