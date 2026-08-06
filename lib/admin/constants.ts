@@ -36,12 +36,11 @@ export const DASHBOARD_STATS = [
     href: "/admin/drivers",
   },
   {
-    icon: "family_restroom",
-    value: "06",
-    label: "Pending",
+    icon: "alt_route",
+    value: "0",
+    label: "Routes",
     tone: "tertiary" as const,
-    badge: "URGENT",
-    href: "/admin/guardians",
+    href: "/admin/routes",
   },
   {
     icon: "payments",

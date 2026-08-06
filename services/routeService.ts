@@ -189,6 +189,63 @@ export async function updateRouteStop(id: number, payload: RouteStop): Promise<v
   }
 }
 
+export interface StudentRouteAssignmentPayload {
+  studentId: number;
+  routeId: number;
+  pickupTime: string;
+  dropoffTime: string;
+  assignedAt: string;
+  status: "Active" | "Inactive" | string;
+}
+
+export async function assignStudentToRoute(
+  payload: StudentRouteAssignmentPayload
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/student-route-assignments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorMessage = "Unable to assign student to route.";
+    try {
+      const body = await response.json();
+      if (body?.message) {
+        errorMessage = body.message;
+      }
+    } catch {
+      // Ignore invalid JSON response
+    }
+    throw new Error(errorMessage);
+  }
+}
+
+export interface StudentRouteAssignment {
+  id: number;
+  studentId: number;
+  routeId: number;
+  status: string;
+}
+
+export async function getStudentRouteAssignments(): Promise<StudentRouteAssignment[]> {
+  const response = await fetch(`${API_BASE_URL}/api/student-route-assignments`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to load student route assignments from the backend.");
+  }
+
+  return response.json();
+}
+
 export async function deleteRouteStop(id: number): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/routes/stops/${id}`, {
     method: "DELETE",

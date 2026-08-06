@@ -188,17 +188,18 @@ export function RoutesManagementPage() {
       }
 
       if (savedRouteId !== null) {
+        const routeId = savedRouteId;
         await Promise.all(
           stops.map(async (stop) => {
             if (!stop.stopName.trim()) return;
 
-            if (stop.id > 0 && stop.routeId === savedRouteId) {
+            if (stop.id > 0 && stop.routeId === routeId) {
               await updateRouteStop(stop.id, {
                 ...stop,
-                routeId: savedRouteId,
+                routeId,
               });
             } else {
-              await createRouteStop(savedRouteId, {
+              await createRouteStop(routeId, {
                 stopName: stop.stopName,
                 arrivalTime: stop.arrivalTime,
                 orderIndex: stop.orderIndex,

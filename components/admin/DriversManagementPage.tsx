@@ -42,7 +42,6 @@ export function DriversManagementPage() {
   const [formPhone, setFormPhone] = useState("");
   const [formEmail, setFormEmail] = useState("");
   const [formLicense, setFormLicense] = useState("");
-  const [formRoute, setFormRoute] = useState("");
   const [formStatus, setFormStatus] = useState<Driver["status"]>("Active");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -64,7 +63,6 @@ export function DriversManagementPage() {
     setFormPhone("");
     setFormEmail("");
     setFormLicense("");
-    setFormRoute("");
     setFormStatus("Active");
     setIsDrawerOpen(true);
   }
@@ -101,7 +99,6 @@ export function DriversManagementPage() {
     setFormPhone(driver.phone);
     setFormEmail(driver.email);
     setFormLicense(driver.licenseNo);
-    setFormRoute(driver.routeLabel === "Unassigned" ? "" : driver.route);
     setFormStatus(driver.status);
     setIsDrawerOpen(true);
   }
@@ -110,9 +107,8 @@ export function DriversManagementPage() {
     event.preventDefault();
     if (!formName.trim() || !formLicense.trim() || !formStatus.trim()) return;
 
-    const hasRoute = Boolean(formRoute);
-    const route = hasRoute ? formRoute : "No route history";
-    const routeLabel = hasRoute ? "Assigned Route" : "Unassigned";
+    const route = "No route history";
+    const routeLabel = "Unassigned";
     const payload = {
       name: formName.trim(),
       phone: formPhone || "",
@@ -145,8 +141,6 @@ export function DriversManagementPage() {
                   ...driver,
                   ...payload,
                   licenseNo: payload.licenseNo,
-                  route,
-                  routeLabel,
                   initials: getInitials(payload.name),
                 }
               : driver
@@ -402,22 +396,6 @@ export function DriversManagementPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-slate-700">Assign Route</label>
-                  <div className="relative">
-                    <select
-                      value={formRoute}
-                      onChange={(event) => setFormRoute(event.target.value)}
-                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
-                    >
-                      <option value="">Select a route...</option>
-                      <option>Northview Academy AM</option>
-                      <option>West Side Shuttle</option>
-                      <option>River Loop</option>
-                    </select>
-                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  </div>
-                </div>
 
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">Status</label>

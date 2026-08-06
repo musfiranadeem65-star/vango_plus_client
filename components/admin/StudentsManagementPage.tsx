@@ -10,8 +10,10 @@ import {
   X,
 } from "lucide-react";
 import type { Guardian } from "@/types/guardian";
+import type { Route } from "@/types/route";
 import { getGuardians } from "@/services/guardianService";
 import { getStudents, updateStudent } from "@/services/studentService";
+import { assignStudentToRoute, getRoutes } from "@/services/routeService";
 
 interface StudentRecord {
   id: number;
@@ -51,6 +53,7 @@ export function StudentsManagementPage() {
   const [guardianLoading, setGuardianLoading] = useState(false);
   const [guardianError, setGuardianError] = useState<string | null>(null);
   const [guardianDropdownOpen, setGuardianDropdownOpen] = useState(false);
+  const [routes, setRoutes] = useState<Route[]>([]);
   const [formRoute, setFormRoute] = useState("");
   const [filter, setFilter] = useState("All Students");
   const [searchText, setSearchText] = useState("");
@@ -97,7 +100,9 @@ export function StudentsManagementPage() {
     setFormGrade(student.grade);
     setFormSection(student.section);
     setFormParent(student.parent);
-    setFormRoute(student.route);
+    setFormRoute(
+      routes.find((route) => route.name === student.route)?.id.toString() ?? ""
+    );
     setSelectedGuardian(guardians.find((guardian) => guardian.userId === student.parentUserId) ?? null);
     setGuardianSearch(student.parent);
     setIsSubmitting(false);
@@ -129,6 +134,17 @@ export function StudentsManagementPage() {
     }
 
     loadGuardians();
+    loadRoutes();
+
+    async function loadRoutes() {
+      try {
+        const routeData = await getRoutes();
+        if (!active) return;
+        setRoutes(routeData);
+      } catch {
+        // Keep dropdown unchanged if routes fail to load.
+      }
+    }
 
     async function loadStudents() {
       try {
@@ -283,6 +299,22 @@ export function StudentsManagementPage() {
           throw new Error(data?.message || `Request failed with status ${response.status}`);
         }
 
+        const createdStudentId = data?.id;
+        const selectedRoute = routes.find((route) => route.id.toString() === formRoute);
+
+        if (selectedRoute && createdStudentId) {
+          await assignStudentToRoute({
+            studentId: createdStudentId,
+            routeId: selectedRoute.id,
+            pickupTime: "07:00 AM",
+            dropoffTime: "03:00 PM",
+            assignedAt: new Date().toISOString(),
+            status: "Active",
+          });
+        }
+
+        const routeName = selectedRoute?.name ?? "Unassigned";
+
         setStudents((current) => [
           {
             id: data?.id ?? Date.now(),
@@ -291,7 +323,7 @@ export function StudentsManagementPage() {
             section: (data?.section ?? formSection) || "—",
             parent: (selectedGuardian?.name ?? formParent) || "—",
             parentUserId,
-            route,
+            route: routeName,
             status: (data?.status as StudentRecord["status"]) || "Active",
             initials: getInitials(data?.name ?? formName.trim()),
           },
@@ -649,10 +681,11 @@ export function StudentsManagementPage() {
                       className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#005691] focus:bg-white"
                     >
                       <option value="">Select a Route</option>
-                      <option>North Loop</option>
-                      <option>West Ridge</option>
-                      <option>Harbor View</option>
-                      <option>South Park</option>
+                      {routes.map((route) => (
+                        <option key={route.id} value={route.id.toString()}>
+                          {route.name}
+                        </option>
+                      ))}
                     </select>
                     <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   </div>
