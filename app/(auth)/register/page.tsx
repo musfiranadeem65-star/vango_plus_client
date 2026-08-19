@@ -1,21 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AuthCard } from "@/components/auth/AuthCard";
-import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { StepIndicator } from "@/components/ui/StepIndicator";
-import type { ParentSubscription, RegisterFormData } from "@/lib/auth/types";
-import {
-  formatPkr,
-  getPlanById,
-  SUBSCRIPTION_PLANS,
-} from "@/lib/subscription/plans";
+import type { RegisterFormData } from "@/lib/auth/types";
+import { ROLE_ROUTES } from "@/lib/auth/constants";
+import { saveAuthSession } from "@/lib/auth/storage";
+import { formatPkr } from "@/lib/subscription/plans";
 import {
   getPasswordStrength,
   validateConfirmPassword,
@@ -23,8 +21,14 @@ import {
   validatePassword,
   validateRequired,
 } from "@/lib/auth/validation";
+import { createUser } from "@/services/userService";
+import {
+  createSubscription,
+  getSubscriptionPlans,
+  type SubscriptionPlan,
+} from "@/services/subscriptionService";
 
-const STEPS = ["Info", "Setup", "Plan", "Payment"];
+const STEPS = ["Info", "Setup", "Plan"];
 
 const CITIES = [
   "Lahore",
@@ -44,21 +48,40 @@ const initialForm: RegisterFormData = {
   confirmPassword: "",
 };
 
+const FREE_TRIAL_PLAN = {
+  name: "Free Trial",
+  price: 0,
+  period: "7 Days",
+  tagline: "7 Days Free Trial",
+  features: ["1 Child Enrollment", "Basic App Tracking", "Email Support"],
+};
+
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<RegisterFormData>(initialForm);
   const [errors, setErrors] = useState<Partial<Record<keyof RegisterFormData, string>>>({});
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [isLoadingPlans, setIsLoadingPlans] = useState(false);
+  const [isCreatingSubscription, setIsCreatingSubscription] = useState(false);
   const [formError, setFormError] = useState<string | undefined>();
-  const [selectedPlanId, setSelectedPlanId] = useState("standard");
-  const [jazzCashNumber, setJazzCashNumber] = useState("");
-  const [jazzCashError, setJazzCashError] = useState<string | undefined>();
+  const [planError, setPlanError] = useState<string | undefined>();
+  const [createdUserId, setCreatedUserId] = useState<number | null>(null);
+  const [freeTrialPlan, setFreeTrialPlan] = useState<SubscriptionPlan | null>(null);
+  const isSubmitting = isCreatingSubscription || isCreatingUser;
 
   const selectedPlan = useMemo(
-    () => getPlanById(selectedPlanId),
-    [selectedPlanId]
+    () => ({
+      ...FREE_TRIAL_PLAN,
+      ...(freeTrialPlan ? {
+        id: freeTrialPlan.id,
+        name: freeTrialPlan.name,
+        price: freeTrialPlan.price,
+        period: freeTrialPlan.period,
+      } : {}),
+    }),
+    [freeTrialPlan]
   );
 
   const passwordStrength = useMemo(
@@ -100,48 +123,133 @@ export default function RegisterPage() {
     return Object.keys(filtered).length === 0;
   }
 
-  function handleNext() {
+  async function handleNext() {
     if (!validateStep(step)) return;
-    setStep((prev) => Math.min(prev + 1, 4));
+
+    if (step === 2) {
+      await createParentUser();
+      return;
+    }
+
+    setStep((prev) => Math.min(prev + 1, 3));
   }
 
   function handleBack() {
     setStep((prev) => Math.max(prev - 1, 1));
   }
 
-  function validateJazzCash(): boolean {
-    const digits = jazzCashNumber.replace(/\D/g, "");
-    if (digits.length < 11) {
-      setJazzCashError("Enter a valid JazzCash mobile number.");
-      return false;
+  async function createParentUser() {
+    if (createdUserId) {
+      setStep(3);
+      return;
     }
-    setJazzCashError(undefined);
-    return true;
+
+    setFormError(undefined);
+    setIsCreatingUser(true);
+
+    try {
+      const user = await createUser({
+        name: form.fullName,
+        email: form.email,
+        password: form.password,
+        phone: form.phone,
+        city: form.city,
+        role: "Parent",
+        status: "Active",
+      });
+
+      // Backend may return the created id under different shapes. Coerce to number.
+      const returnedId = Number(user?.id ?? user?.userId ?? user?.data?.id ?? NaN);
+      if (Number.isNaN(returnedId) || !returnedId) {
+        throw new Error("User created but backend did not return a valid id.");
+      }
+      setCreatedUserId(returnedId);
+      setStep(3);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to create account.");
+    } finally {
+      setIsCreatingUser(false);
+    }
   }
+
+  async function loadFreeTrialPlan() {
+    if (freeTrialPlan || planError) return;
+
+    setPlanError(undefined);
+    setIsLoadingPlans(true);
+
+    try {
+      const plans = await getSubscriptionPlans();
+      const trialPlan = plans.find((plan) =>
+        typeof plan.name === "string" && plan.name.toLowerCase().includes("free trial")
+      );
+      if (!trialPlan) {
+        throw new Error("Free Trial plan is not available.");
+      }
+      setFreeTrialPlan(trialPlan);
+    } catch (error) {
+      setPlanError(error instanceof Error ? error.message : "Unable to load subscription plans.");
+    } finally {
+      setIsLoadingPlans(false);
+    }
+  }
+
+  useEffect(() => {
+    if (step === 3) {
+      void loadFreeTrialPlan();
+    }
+  }, [step]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
     if (!agreedToTerms || !selectedPlan) return;
-    if (!validateJazzCash()) return;
+    if (!createdUserId) {
+      setFormError("Please complete account setup before starting the free trial.");
+      return;
+    }
+    if (!freeTrialPlan) {
+      setFormError("Unable to start free trial because the plan is not available.");
+      return;
+    }
 
     setFormError(undefined);
-    setIsSubmitting(true);
+    setIsCreatingSubscription(true);
 
-    const subscription: ParentSubscription = {
-      planId: selectedPlan.id,
-      planName: selectedPlan.name,
-      price: selectedPlan.price,
-      status: "active",
-      paymentMethod: "JazzCash",
-      startedAt: new Date().toISOString(),
-    };
+    try {
+      const subscription = await createSubscription({
+        id: 0,
+        userId: Number(createdUserId),
+        planId: Number(freeTrialPlan.id),
+        planName: selectedPlan.name,
+        price: Number(selectedPlan.price) ?? 0,
+        status: "Active",
+        paymentMethod: "None",
+        startedAt: new Date().toISOString(),
+      });
 
-    const result = await register(form, subscription);
+      saveAuthSession(
+        {
+          id: createdUserId,
+          email: form.email,
+          role: "parent",
+          name: form.fullName,
+          subscription: {
+            planId: subscription.planId ?? freeTrialPlan.id,
+            planName: subscription.planName ?? selectedPlan.name,
+            price: subscription.price ?? selectedPlan.price,
+            status: subscription.status ?? "active",
+            paymentMethod: subscription.paymentMethod ?? "None",
+            startedAt: subscription.startedAt ?? new Date().toISOString(),
+          },
+        },
+        true
+      );
 
-    if (result.error) {
-      setFormError(result.error);
-      setIsSubmitting(false);
+      router.push(ROLE_ROUTES.parent);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to start free trial.");
+      setIsCreatingSubscription(false);
     }
   }
 
@@ -247,136 +355,67 @@ export default function RegisterPage() {
         )}
 
         {step === 3 && (
-          <div className="space-y-3">
+          <div className="space-y-6">
             <p className="text-sm text-muted font-[family-name:var(--font-inter)]">
-              Choose a subscription plan for your child&apos;s transport.
+              Start your 7 day free trial with no payment required.
             </p>
-            {SUBSCRIPTION_PLANS.map((plan) => {
-              const isSelected = plan.id === selectedPlanId;
-              return (
-                <button
-                  key={plan.id}
-                  type="button"
-                  onClick={() => setSelectedPlanId(plan.id)}
-                  className={`w-full rounded-xl border p-4 text-left transition ${
-                    isSelected
-                      ? "border-parent bg-parent/5 ring-2 ring-parent/20"
-                      : "border-border bg-white hover:border-parent/50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-bold text-foreground">
-                          {plan.name}
-                        </h3>
-                        {plan.recommended && (
-                          <span className="rounded-full bg-parent/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-parent">
-                            Popular
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted font-[family-name:var(--font-inter)]">
-                        {plan.tagline}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-foreground">
-                        {formatPkr(plan.price)}
-                      </p>
-                      <p className="text-[11px] text-muted font-[family-name:var(--font-inter)]">
-                        per {plan.period}
-                      </p>
-                    </div>
-                  </div>
-                  <ul className="mt-3 space-y-1">
-                    {plan.features.map((feature) => (
-                      <li
-                        key={feature}
-                        className="flex items-center gap-2 text-xs text-foreground font-[family-name:var(--font-inter)]"
-                      >
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-parent" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {step === 4 && selectedPlan && (
-          <div className="space-y-5">
-            <div className="rounded-xl border border-border bg-background p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">
-                  Order Summary
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setStep(3)}
-                  className="text-xs font-medium text-parent hover:underline"
-                >
-                  Change plan
-                </button>
-              </div>
-              <dl className="space-y-2 text-sm font-[family-name:var(--font-inter)]">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted">Plan</dt>
-                  <dd className="font-medium text-foreground text-right">
-                    {selectedPlan.name}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted">Billing</dt>
-                  <dd className="font-medium text-foreground text-right">
-                    Monthly
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4 border-t border-border pt-2">
-                  <dt className="text-foreground font-semibold">
-                    Total due today
-                  </dt>
-                  <dd className="font-bold text-foreground text-right">
-                    {formatPkr(selectedPlan.price)}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-
-            <div className="rounded-xl border border-border p-5 space-y-4">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#9B1B6E] text-sm font-bold text-white">
-                  JC
-                </span>
+            <div className="rounded-[1.5rem] border border-border bg-white p-6 shadow-[var(--shadow-card)]">
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">
-                    Pay with JazzCash
+                  <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">
+                    {selectedPlan.name}
+                  </p>
+                  <h3 className="mt-3 text-3xl font-semibold text-slate-950">
+                    {formatPkr(selectedPlan.price)}
                   </h3>
-                  <p className="text-xs text-muted font-[family-name:var(--font-inter)]">
-                    You&apos;ll receive a payment prompt on your mobile.
+                  <p className="mt-2 text-sm text-muted">
+                    {selectedPlan.tagline}
                   </p>
                 </div>
               </div>
-              <Input
-                label="JazzCash Mobile Number"
-                type="tel"
-                placeholder="03XX XXXXXXX"
-                value={jazzCashNumber}
-                onChange={(e) => {
-                  setJazzCashNumber(e.target.value);
-                  setJazzCashError(undefined);
-                }}
-                error={jazzCashError}
-              />
+              <ul className="mt-6 space-y-3 text-sm text-slate-600">
+                {selectedPlan.features.map((feature) => (
+                  <li key={feature} className="flex items-center gap-3">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
+                      ✓
+                    </span>
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-
+            <div className="rounded-xl border border-border bg-background p-5">
+              <h3 className="text-sm font-semibold text-foreground">
+                Order Summary
+              </h3>
+              <dl className="mt-4 space-y-3 text-sm text-slate-600">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted">Plan</dt>
+                  <dd className="font-medium text-foreground">{selectedPlan.name}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted">Billing</dt>
+                  <dd className="font-medium text-foreground">{selectedPlan.period}</dd>
+                </div>
+                <div className="flex justify-between gap-4 border-t border-border pt-3">
+                  <dt className="text-foreground font-semibold">Total due today</dt>
+                  <dd className="font-bold text-foreground">{formatPkr(selectedPlan.price)}</dd>
+                </div>
+              </dl>
+            </div>
             <Checkbox
               label="I agree to the Terms of Service and Privacy Policy."
               checked={agreedToTerms}
               onChange={(e) => setAgreedToTerms(e.target.checked)}
             />
+            {planError && (
+              <div
+                role="alert"
+                className="rounded-lg border border-error/30 bg-error/5 px-4 py-3 text-sm text-error font-[family-name:var(--font-inter)]"
+              >
+                {planError}
+              </div>
+            )}
           </div>
         )}
 
@@ -386,22 +425,18 @@ export default function RegisterPage() {
               Back
             </Button>
           )}
-          {step < 4 ? (
+          {step < 3 ? (
             <Button type="button" variant="parent" onClick={handleNext} className="flex-1">
               Next
             </Button>
           ) : (
-            <Button
+                <Button
               type="submit"
               variant="parent"
               className="flex-1"
               disabled={!agreedToTerms || isSubmitting}
             >
-              {isSubmitting
-                ? "Processing payment..."
-                : selectedPlan
-                  ? `Pay ${formatPkr(selectedPlan.price)} & Register`
-                  : "Complete Registration"}
+              {isSubmitting ? "Starting free trial..." : "Start Free Trial"}
             </Button>
           )}
         </div>

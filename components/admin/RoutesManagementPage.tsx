@@ -11,18 +11,16 @@ import {
   Users,
   X,
 } from "lucide-react";
+import type { Driver } from "@/types/driver";
 import type { Route, RouteStop } from "@/types/route";
 import {
   createRoute,
-  createRouteStop,
   deleteRoute,
-  deleteRouteStop,
   getRoutes,
-  getStopsByRoute,
   updateRoute,
   updateRouteStatus,
-  updateRouteStop,
 } from "@/services/routeService";
+import { getDrivers } from "@/services/driverService";
 
 interface RouteCard extends Route {
   driver: string;
@@ -37,7 +35,7 @@ const statusStyles = {
   Inactive: "bg-slate-100 text-slate-600",
 };
 
-// Driver will be entered manually in the form (name + id)
+// Driver selection is populated from the backend drivers API
 
 export function RoutesManagementPage() {
   const [routes, setRoutes] = useState<RouteCard[]>([]);
@@ -51,6 +49,9 @@ export function RoutesManagementPage() {
   const [routeStatus, setRouteStatus] = useState<Route["status"]>("Active");
   const [routeDescription, setRouteDescription] = useState("");
   const [stops, setStops] = useState<RouteStop[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [driversLoading, setDriversLoading] = useState(false);
+  const [driversError, setDriversError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -64,27 +65,17 @@ export function RoutesManagementPage() {
 
       try {
         const data = await getRoutes();
-        const stopCounts = await Promise.all(
-          data.map(async (route) => {
-            try {
-              const stops = await getStopsByRoute(route.id);
-              return stops.length;
-            } catch {
-              return 0;
-            }
-          })
-        );
 
-        const mappedRoutes: RouteCard[] = data.map((route, index) => ({
-          ...route,
-          driver: `Driver ${route.driverId}`,
-          stops: stopCounts[index],
-          students: 0,
-          accent: index % 2 === 0 ? "blue" : "orange",
-        }));
+      const mappedRoutes: RouteCard[] = data.map((route, index) => ({
+        ...route,
+        driver: `Driver ${route.driverId}`,
+        stops: route.routeStops?.length ?? 0,
+        students: 0,
+        accent: index % 2 === 0 ? "blue" : "orange",
+      }));
 
-        setRoutes(mappedRoutes);
-        setSelectedRoute(mappedRoutes[0] ?? null);
+      setRoutes(mappedRoutes);
+      setSelectedRoute(mappedRoutes[0] ?? null);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Unable to load routes.");
       } finally {
@@ -105,7 +96,10 @@ export function RoutesManagementPage() {
     setRouteDescription("");
     setStops([]);
     setErrorMessage("");
+    setDrivers([]);
+    setDriversError("");
     setIsFormOpen(true);
+    loadDrivers();
   }
 
   function openEditRoute(route: RouteCard) {
@@ -114,25 +108,15 @@ export function RoutesManagementPage() {
     setSelectedRoute(route);
     setRouteName(route.name);
     setDriverId(String(route.driverId));
-    setDriverName(route.driver || `Driver ${route.driverId}`);
+    setDriverName(route.driver || "");
     setRouteStatus(route.status);
     setRouteDescription(route.description ?? "");
+    setStops(route.routeStops ?? []);
     setErrorMessage("");
-    loadStops(route.id);
+    setDrivers([]);
+    setDriversError("");
     setIsFormOpen(true);
-  }
-
-  async function loadStops(routeId: number) {
-    try {
-      const routeStops = await getStopsByRoute(routeId);
-      setStops(routeStops.map((stop) => ({
-        ...stop,
-        arrivalTime: stop.arrivalTime,
-      })));
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to load route stops.");
-      setStops([]);
-    }
+    loadDrivers();
   }
 
   async function handleSaveRoute() {
@@ -141,16 +125,25 @@ export function RoutesManagementPage() {
       return;
     }
 
-    if (Number(driverId) <= 0 || Number.isNaN(Number(driverId))) {
-      setErrorMessage("Driver ID (numeric) is required.");
+    if (!driverId || Number(driverId) <= 0 || Number.isNaN(Number(driverId))) {
+      setErrorMessage("Driver selection is required.");
       return;
     }
+
+    const validStops = stops
+      .filter((stop) => stop.stopName.trim())
+      .map((stop, index) => ({
+        stopName: stop.stopName.trim(),
+        arrivalTime: stop.arrivalTime,
+        orderIndex: index + 1,
+      }));
 
     const payload = {
       name: routeName.trim(),
       status: routeStatus,
       driverId: Number(driverId),
       description: routeDescription,
+      routeStops: validStops,
     };
 
     setIsSaving(true);
@@ -165,7 +158,7 @@ export function RoutesManagementPage() {
         const newRoute: RouteCard = {
           ...created,
           driver: driverName || `Driver ${created.driverId}`,
-          stops: stops.filter((stop) => stop.stopName.trim()).length,
+          stops: created.routeStops?.length ?? validStops.length,
           students: 0,
           accent: routes.length % 2 === 0 ? "blue" : "orange",
         };
@@ -175,37 +168,19 @@ export function RoutesManagementPage() {
         await updateRoute(editingId, payload);
         setRoutes((current) =>
           current.map((route) =>
-                route.id === editingId
+            route.id === editingId
               ? {
                   ...route,
-                  ...payload,
+                  name: payload.name,
+                  status: payload.status,
+                  driverId: payload.driverId,
+                  description: payload.description,
                   driver: driverName || route.driver,
-                  stops: stops.filter((stop) => stop.stopName.trim()).length,
+                  stops: validStops.length,
+                  routeStops: route.routeStops ?? [],
                 }
               : route
           )
-        );
-      }
-
-      if (savedRouteId !== null) {
-        const routeId = savedRouteId;
-        await Promise.all(
-          stops.map(async (stop) => {
-            if (!stop.stopName.trim()) return;
-
-            if (stop.id > 0 && stop.routeId === routeId) {
-              await updateRouteStop(stop.id, {
-                ...stop,
-                routeId,
-              });
-            } else {
-              await createRouteStop(routeId, {
-                stopName: stop.stopName,
-                arrivalTime: stop.arrivalTime,
-                orderIndex: stop.orderIndex,
-              });
-            }
-          })
         );
       }
     } catch (error) {
@@ -216,6 +191,27 @@ export function RoutesManagementPage() {
     }
   }
 
+  async function loadDrivers() {
+    setDriversLoading(true);
+    setDriversError("");
+
+    try {
+      const data = await getDrivers();
+      setDrivers(data);
+      if (formMode === "edit" && editingId !== null) {
+        const matchedDriver = data.find((driver) => driver.id === Number(driverId));
+        if (matchedDriver) {
+          setDriverName(matchedDriver.name);
+          setDriverId(String(matchedDriver.id));
+        }
+      }
+    } catch (error) {
+      setDriversError(error instanceof Error ? error.message : "Unable to load drivers.");
+    } finally {
+      setDriversLoading(false);
+    }
+  }
+
   function addStop() {
     setStops((current) => [
       ...current,
@@ -223,21 +219,14 @@ export function RoutesManagementPage() {
     ]);
   }
 
-  async function removeStop(id: number) {
-    const stopToDelete = stops.find((stop) => stop.id === id);
+  function selectDriver(selectedId: string) {
+    setDriverId(selectedId);
+    const id = Number(selectedId);
+    const driver = drivers.find((item) => item.id === id);
+    setDriverName(driver?.name ?? "");
+  }
 
-    if (
-      editingId !== null &&
-      stopToDelete?.routeId === editingId &&
-      stopToDelete.id > 0
-    ) {
-      try {
-        await deleteRouteStop(id);
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Unable to delete route stop.");
-      }
-    }
-
+  function removeStop(id: number) {
     setStops((current) => current.filter((stop) => stop.id !== id));
   }
 
@@ -445,23 +434,59 @@ export function RoutesManagementPage() {
 
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">Driver Name</label>
-                  <input
-                    value={driverName}
-                    onChange={(event) => setDriverName(event.target.value)}
-                    placeholder="e.g. David Anderson"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
-                  />
+                  <div className="relative">
+                    <select
+                      value={driverId}
+                      onChange={(event) => selectDriver(event.target.value)}
+                      disabled={driversLoading || drivers.length === 0}
+                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <option value="" disabled={driversLoading || drivers.length > 0}>
+                        {driversLoading ? "Loading drivers..." : "Select driver"}
+                      </option>
+                      {drivers.length === 0 && !driversLoading ? (
+                        <option value="" disabled>
+                          No drivers available
+                        </option>
+                      ) : null}
+                      {drivers.map((driver) => (
+                        <option key={driver.id} value={driver.id}>
+                          {driver.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                  {driversError ? (
+                    <p className="mt-2 text-sm text-rose-600">{driversError}</p>
+                  ) : null}
                 </div>
 
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-slate-700">Driver ID</label>
-                  <input
-                    value={driverId}
-                    onChange={(event) => setDriverId(event.target.value)}
-                    type="text"
-                    placeholder="Enter driver id number"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white"
-                  />
+                  <div className="relative">
+                    <select
+                      value={driverId}
+                      onChange={(event) => selectDriver(event.target.value)}
+                      disabled={driversLoading || drivers.length === 0}
+                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#0B5394] focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <option value="" disabled={driversLoading || drivers.length > 0}>
+                        {driversLoading ? "Loading drivers..." : "Select driver"}
+                      </option>
+                      {drivers.length === 0 && !driversLoading ? (
+                        <option value="" disabled>
+                          No drivers available
+                        </option>
+                      ) : null}
+                      {drivers.map((driver) => (
+                        <option key={driver.id} value={driver.id}>
+                          {driver.id}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
                 </div>
 
                 <div>

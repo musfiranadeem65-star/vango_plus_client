@@ -16,15 +16,16 @@ export interface RegisterFormData {
 }
 
 export interface ParentSubscription {
-  planId: string;
+  planId: string | number;
   planName: string;
   price: number;
-  status: "active";
-  paymentMethod: "JazzCash";
+  status: string;
+  paymentMethod: string;
   startedAt: string;
 }
 
 export interface AuthUser {
+  id?: number;
   email: string;
   role: UserRole;
   name?: string;

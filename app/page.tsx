@@ -84,6 +84,13 @@ const plans = [
     items: ["Up to 4 Children", "Dedicated Account Manager", "Home Pick-up Guarantee", "Insurance Coverage"],
     featured: false,
   },
+  {
+    name: "Free Trial",
+    price: "PKR 0/mo",
+    note: "7 Day Free Trial",
+    items: ["1 Child Enrollment", "Basic App Tracking", "Email Support"],
+    featured: false,
+  },
 ];
 
 export default function Home() {
@@ -454,7 +461,7 @@ export default function Home() {
             Flexible subscriptions with easy digital wallet payments.
           </h2>
         </div>
-        <div className="mx-auto mt-12 grid gap-6 lg:grid-cols-3">
+        <div className="mx-auto mt-12 grid gap-6 lg:grid-cols-4">
           {plans.map((plan) => (
             <div
               key={plan.name}

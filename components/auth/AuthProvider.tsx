@@ -43,6 +43,14 @@ interface AuthContextValue {
   logout: () => void;
 }
 
+function normalizeRole(role: string | null | undefined): UserRole | null {
+  if (!role || typeof role !== "string") return null;
+  const normalized = role.trim().toLowerCase();
+  if (normalized === "admin") return "admin";
+  if (normalized === "parent") return "parent";
+  return null;
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -57,7 +65,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // One-time hydration from browser storage after mount. This must run in an
     // effect (not a lazy initializer) to avoid an SSR/client hydration mismatch.
     const stored = getAuthSession();
-    const valid = stored && stored.role in ROLE_ROUTES ? stored : null;
+    const normalizedRole = normalizeRole(stored?.role);
+    const valid = stored && normalizedRole && normalizedRole in ROLE_ROUTES
+      ? { ...stored, role: normalizedRole }
+      : null;
     if (stored && !valid) {
       clearAuthSession();
     }
@@ -72,9 +83,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: result.error ?? "Unable to sign in." };
       }
 
-      saveAuthSession(result.user, rememberMe);
-      setSession({ user: result.user, isLoading: false });
-      router.push(ROLE_ROUTES[result.user.role]);
+      const normalizedUser = {
+        ...result.user,
+        role: normalizeRole(result.user.role) ?? result.user.role,
+      };
+      saveAuthSession(normalizedUser, rememberMe);
+      setSession({ user: normalizedUser, isLoading: false });
+      router.push(ROLE_ROUTES[normalizedUser.role]);
       return {};
     },
     [router]
@@ -87,9 +102,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: result.error ?? "Unable to create account." };
       }
 
-      saveAuthSession(result.user, true);
-      setSession({ user: result.user, isLoading: false });
-      router.push(ROLE_ROUTES[result.user.role]);
+      const normalizedUser = {
+        ...result.user,
+        role: normalizeRole(result.user.role) ?? result.user.role,
+      };
+      saveAuthSession(normalizedUser, true);
+      setSession({ user: normalizedUser, isLoading: false });
+      router.push(ROLE_ROUTES[normalizedUser.role]);
       return {};
     },
     [router]

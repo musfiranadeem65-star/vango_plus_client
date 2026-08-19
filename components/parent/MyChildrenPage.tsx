@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bus,
   CalendarOff,
@@ -17,6 +17,13 @@ import {
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AddGuardianDrawer } from "@/components/parent/AddGuardianDrawer";
 import { getPlanById } from "@/lib/subscription/plans";
+import {
+  createStudent,
+  getStudentById,
+  getStudentsByParentId,
+} from "@/services/studentService";
+import { getUserByEmail } from "@/services/userService";
+import type { Student } from "@/types/student";
 
 type ChildStatus = "active" | "pending";
 type GuardianStatus = "approved" | "pending";
@@ -47,34 +54,15 @@ interface Child {
   guardians: ChildGuardian[];
 }
 
-const initialChildren: Child[] = [
-  {
-    id: "marcus",
-    name: "Marcus Chen",
-    grade: "Grade 4-B",
-    initials: "MC",
-    accent: "blue",
-    status: "active",
-    routeLabel: "Route 12",
-    routeAssigned: true,
-    transport: {
-      route: "Route 12 - North Hills",
-      driver: "Sam Wilson",
-      pickup: "07:45 AM",
-      dropoff: "03:20 PM",
-    },
-    guardians: [
-      { name: "Linda Chen", relation: "Mother • Primary Contact", initials: "LC", status: "approved", primary: true },
-      { name: "David Chen", relation: "Father", initials: "DC", status: "approved" },
-    ],
-  },
-  {
-    id: "elena",
-    name: "Elena Rodriguez",
-    grade: "Kindergarten",
-    initials: "ER",
-    accent: "teal",
-    status: "pending",
+function mapStudentToChild(student: Student, accent: Child["accent"]): Child {
+  const status = student.status.toLowerCase() === "active" ? "active" : "pending";
+  return {
+    id: String(student.id),
+    name: student.name,
+    grade: student.grade || "Unassigned",
+    initials: getInitials(student.name),
+    accent,
+    status,
     routeLabel: "No Route Assigned",
     routeAssigned: false,
     transport: {
@@ -83,30 +71,11 @@ const initialChildren: Child[] = [
       pickup: "—",
       dropoff: "—",
     },
-    guardians: [
-      { name: "Maria Rodriguez", relation: "Mother • Primary Contact", initials: "MR", status: "pending", primary: true },
-    ],
-  },
-  {
-    id: "sophie",
-    name: "Sophie Müller",
-    grade: "Grade 2-A",
-    initials: "SM",
-    accent: "slate",
-    status: "active",
-    routeLabel: "Route 08",
-    routeAssigned: true,
-    transport: {
-      route: "Route 08 - Riverside",
-      driver: "Anna Becker",
-      pickup: "07:30 AM",
-      dropoff: "03:10 PM",
-    },
-    guardians: [
-      { name: "Hannah Müller", relation: "Mother • Primary Contact", initials: "HM", status: "approved", primary: true },
-    ],
-  },
-];
+    guardians: [],
+  };
+}
+
+const initialChildren: Child[] = [];
 
 const accentClasses: Record<Child["accent"], string> = {
   blue: "bg-primary text-white",
@@ -130,13 +99,18 @@ export default function MyChildrenPage() {
   const maxChildren = plan?.maxChildren ?? 0;
 
   const [children, setChildren] = useState<Child[]>(initialChildren);
-  const [selectedId, setSelectedId] = useState<string>(initialChildren[0].id);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addChildOpen, setAddChildOpen] = useState(false);
   const [guardianDrawerOpen, setGuardianDrawerOpen] = useState(false);
   const [formName, setFormName] = useState("");
   const [formGrade, setFormGrade] = useState("");
+  const [loadingChildren, setLoadingChildren] = useState(true);
+  const [childrenError, setChildrenError] = useState<string | null>(null);
+  const [saveChildrenError, setSaveChildrenError] = useState<string | null>(null);
+  const [isSavingChild, setIsSavingChild] = useState(false);
+  const [resolvedParentId, setResolvedParentId] = useState<number | null>(null);
 
-  const selected = children.find((child) => child.id === selectedId) ?? children[0];
+  const selected = children.find((child) => child.id === selectedId) ?? null;
 
   const canAddChild = Boolean(subscription) && children.length < maxChildren;
   const limitMessage = !subscription
@@ -147,33 +121,138 @@ export default function MyChildrenPage() {
         }. Upgrade to add more.`
       : "";
 
-  function handleAddChild() {
-    const name = formName.trim();
-    if (!name) return;
+  useEffect(() => {
+    if (!user?.email) return;
 
-    const newChild: Child = {
-      id: `${Date.now()}`,
-      name,
-      grade: formGrade.trim() || "Unassigned",
-      initials: getInitials(name),
-      accent: accentCycle[children.length % accentCycle.length],
-      status: "pending",
-      routeLabel: "No Route Assigned",
-      routeAssigned: false,
-      transport: {
-        route: "Awaiting Assignment",
-        driver: "Awaiting Assignment",
-        pickup: "—",
-        dropoff: "—",
-      },
-      guardians: [],
+    let isMounted = true;
+    const fetchParentAccount = async () => {
+      setChildrenError(null);
+      setLoadingChildren(true);
+
+      try {
+        const account = await getUserByEmail(user.email);
+        if (!account?.id) {
+          throw new Error("Unable to determine your account. Please refresh and try again.");
+        }
+
+        const role = String(account.role ?? "").trim().toLowerCase();
+        if (role !== "parent") {
+          throw new Error("Unable to determine your account. Please refresh and try again.");
+        }
+
+        if (isMounted) {
+          setResolvedParentId(Number(account.id));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setChildrenError(error instanceof Error ? error.message : "Unable to determine your account. Please refresh and try again.");
+          setResolvedParentId(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingChildren(false);
+        }
+      }
     };
 
-    setChildren((prev) => [...prev, newChild]);
-    setSelectedId(newChild.id);
-    setFormName("");
-    setFormGrade("");
-    setAddChildOpen(false);
+    void fetchParentAccount();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.email]);
+
+  useEffect(() => {
+    if (!resolvedParentId) return;
+
+    let isMounted = true;
+    const fetchChildren = async () => {
+      setLoadingChildren(true);
+      setChildrenError(null);
+
+      try {
+        const students = await getStudentsByParentId(resolvedParentId);
+        const mappedChildren = students.map((student, index) =>
+          mapStudentToChild(student, accentCycle[index % accentCycle.length])
+        );
+        if (isMounted) {
+          setChildren(mappedChildren);
+          setSelectedId(mappedChildren[0]?.id ?? null);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setChildrenError(error instanceof Error ? error.message : "Unable to load children.");
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingChildren(false);
+        }
+      }
+    };
+
+    void fetchChildren();
+    return () => {
+      isMounted = false;
+    };
+  }, [resolvedParentId]);
+
+  async function handleAddChild() {
+    const name = formName.trim();
+    if (!name || !resolvedParentId) return;
+
+    setIsSavingChild(true);
+    setSaveChildrenError(null);
+
+    try {
+      const payload = {
+        parentUserId: resolvedParentId,
+        name,
+        grade: formGrade.trim() || "Unassigned",
+        section: formGrade.trim() || "Unassigned",
+        status: "Pending",
+      };
+      const createdStudent = await createStudent(payload);
+      const newChild = mapStudentToChild(createdStudent, accentCycle[children.length % accentCycle.length]);
+      setChildren((prev) => [...prev, newChild]);
+      setSelectedId(newChild.id);
+      setFormName("");
+      setFormGrade("");
+      setAddChildOpen(false);
+    } catch (error) {
+      setSaveChildrenError(error instanceof Error ? error.message : "Unable to add child.");
+    } finally {
+      setIsSavingChild(false);
+    }
+  }
+
+  async function handleSelectChild(childId: string) {
+    setSelectedId(childId);
+    if (!user?.id) return;
+
+    try {
+      const student = await getStudentById(Number(childId));
+      setChildren((current) =>
+        current.map((child) =>
+          child.id === childId
+            ? {
+                ...child,
+                ...mapStudentToChild(student, child.accent),
+              }
+            : child
+        )
+      );
+    } catch {
+      // keep current child data if detail fetch fails
+    }
+  }
+
+  async function handleSaveGuardian(data: {
+    name: string;
+    relation: string;
+    phone: string;
+    note?: string;
+  }) {
+    // Guardian save is not implemented yet.
+    return Promise.resolve();
   }
 
   return (
@@ -211,54 +290,67 @@ export default function MyChildrenPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
         <section className="flex flex-col gap-4">
-          {children.map((child) => {
-            const isSelected = child.id === selected.id;
-            return (
-              <button
-                key={child.id}
-                type="button"
-                onClick={() => setSelectedId(child.id)}
-                className={`flex items-center gap-4 rounded-2xl border bg-surface p-4 text-left shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)] ${
-                  isSelected ? "border-primary ring-1 ring-primary" : "border-border"
-                }`}
-              >
-                <span
-                  className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-base font-bold ${accentClasses[child.accent]}`}
-                >
-                  {child.initials}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="truncate text-base font-bold text-foreground">{child.name}</h3>
-                    {child.status === "active" ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-secondary-container px-2.5 py-1 text-xs font-semibold text-on-secondary-container">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-tertiary-fixed px-2.5 py-1 text-xs font-semibold text-tertiary">
-                        Pending
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-0.5 font-[family-name:var(--font-inter)] text-xs font-medium text-on-surface-variant">
-                    {child.grade}
-                  </p>
-                  <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-on-surface-variant">
-                    {child.routeAssigned ? (
-                      <Bus size={14} className="text-primary" />
-                    ) : (
-                      <Clock size={14} className="text-tertiary" />
-                    )}
-                    <span>{child.routeLabel}</span>
-                  </div>
-                </div>
-                <ChevronRight size={18} className="shrink-0 text-muted" />
-              </button>
-            );
-          })}
+          {loadingChildren ? (
+            <div className="rounded-2xl border border-border bg-surface p-6 text-center text-sm font-medium text-on-surface-variant">
+              Loading children...
+            </div>
+          ) : childrenError ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm font-medium text-red-700">
+              {childrenError}
+            </div>
+          ) : (
+            <>
+              {children.map((child) => {
+                const isSelected = child.id === selected?.id;
+                return (
+                  <button
+                    key={child.id}
+                    type="button"
+                    onClick={() => setSelectedId(child.id)}
+                    className={`flex items-center gap-4 rounded-2xl border bg-surface p-4 text-left shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)] ${
+                      isSelected ? "border-primary ring-1 ring-primary" : "border-border"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-base font-bold ${accentClasses[child.accent]}`}
+                    >
+                      {child.initials}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="truncate text-base font-bold text-foreground">{child.name}</h3>
+                        {child.status === "active" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-secondary-container px-2.5 py-1 text-xs font-semibold text-on-secondary-container">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-tertiary-fixed px-2.5 py-1 text-xs font-semibold text-tertiary">
+                            Pending
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 font-[family-name:var(--font-inter)] text-xs font-medium text-on-surface-variant">
+                        {child.grade}
+                      </p>
+                      <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-on-surface-variant">
+                        {child.routeAssigned ? (
+                          <Bus size={14} className="text-primary" />
+                        ) : (
+                          <Clock size={14} className="text-tertiary" />
+                        )}
+                        <span>{child.routeLabel}</span>
+                      </div>
+                    </div>
+                    <ChevronRight size={18} className="shrink-0 text-muted" />
+                  </button>
+                );
+              })}
+            </>
+          )}
         </section>
 
-        <aside className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
+        {selected ? (
+          <aside className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
           <div className="flex items-center gap-4">
             <span
               className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-lg font-bold ${accentClasses[selected.accent]}`}
@@ -388,6 +480,7 @@ export default function MyChildrenPage() {
             Report Absence for Today
           </button>
         </aside>
+      ) : null}
       </div>
 
       {addChildOpen ? (
@@ -477,6 +570,7 @@ export default function MyChildrenPage() {
       <AddGuardianDrawer
         open={guardianDrawerOpen}
         onClose={() => setGuardianDrawerOpen(false)}
+        onSave={handleSaveGuardian}
       />
     </div>
   );

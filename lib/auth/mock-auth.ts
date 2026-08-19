@@ -14,12 +14,14 @@ import type {
 
 const SEED_USERS: MockUser[] = [
   {
+    id: 1,
     email: "admin@vango.test",
     password: "password",
     role: "admin",
     name: "VanGo Admin",
   },
   {
+    id: 2,
     email: "parent@vango.test",
     password: "password",
     role: "parent",
@@ -60,6 +62,7 @@ function writeUsers(users: MockUser[]): void {
 
 function toAuthUser(user: MockUser): AuthUser {
   return {
+    id: user.id,
     email: user.email,
     role: user.role,
     name: user.name,
@@ -104,6 +107,7 @@ export async function registerUser(
   }
 
   const newUser: MockUser = {
+    id: Date.now(),
     email: normalized,
     password: form.password,
     role: "parent",
