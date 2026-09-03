@@ -101,7 +101,9 @@ export default function GuardiansPage() {
     setDrawerError(null);
   };
 
-  const handleSaveGuardian = async (payload: Omit<GuardianPayload, "status">) => {
+  const handleSaveGuardian = async (
+    payload: Omit<GuardianPayload, "status" | "userId">
+  ) => {
     if (!userId) {
       setDrawerError("Unable to determine your account. Please refresh and try again.");
       return;

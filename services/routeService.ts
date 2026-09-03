@@ -34,6 +34,25 @@ export async function getRouteById(id: number): Promise<Route> {
   return response.json();
 }
 
+export async function getRouteStops(id: number): Promise<RouteStop[]> {
+  const response = await fetch(`${API_BASE_URL}/api/routes/${id}/stops`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to load route stops from the backend.");
+  }
+
+  const body = (await response.json()) as unknown;
+  if (Array.isArray(body)) return body as RouteStop[];
+  if (body && typeof body === "object" && Array.isArray((body as { data?: unknown }).data)) {
+    return (body as { data: RouteStop[] }).data;
+  }
+  return [];
+}
+
 export interface RoutePayload {
   name: string;
   status: "Active" | "Inactive" | "Maintenance";

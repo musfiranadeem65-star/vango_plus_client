@@ -48,7 +48,7 @@ export async function createUser(
     return await res.json();
   } catch {
     // If no JSON body, return a minimal object with status for callers.
-    return { id: undefined } as UserCreateResponse;
+    return { id: undefined } as unknown as UserCreateResponse;
   }
 }
 
@@ -58,6 +58,17 @@ export interface UserResponse {
   email?: string;
   role?: string;
   name?: string;
+  subscriptions?: Array<{
+    id?: number;
+    userId?: number;
+    planId?: number | string;
+    planName?: string;
+    price?: number;
+    status?: string;
+    paymentMethod?: string;
+    startedAt?: string;
+    [key: string]: unknown;
+  }>;
   [key: string]: unknown;
 }
 
@@ -67,8 +78,10 @@ function normalizeUserResponse(user: unknown): UserResponse | null {
   const record = user as Record<string, unknown>;
   if (typeof record.email !== "string") return null;
 
+  const nestedData = record.data && typeof record.data === "object" ? (record.data as Record<string, unknown>) : undefined;
+
   return {
-    id: Number(record.id ?? record.userId ?? record.data?.id ?? record.data?.userId) || undefined,
+    id: Number(record.id ?? record.userId ?? nestedData?.id ?? nestedData?.userId) || undefined,
     userId: Number(record.userId) || undefined,
     email: record.email,
     role: typeof record.role === "string" ? record.role : undefined,
@@ -100,9 +113,9 @@ export async function getUserByEmail(email: string): Promise<UserResponse> {
 
       if (Array.isArray(body.data)) {
         return body.data.find(
-          (item) =>
+          (item: Record<string, unknown> | null | undefined) =>
             typeof item?.email === "string" &&
-            item.email.trim().toLowerCase() === email.trim().toLowerCase()
+            String(item.email).trim().toLowerCase() === email.trim().toLowerCase()
         ) ?? null;
       }
 

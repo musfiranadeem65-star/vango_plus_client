@@ -7,6 +7,7 @@ export interface Guardian {
   status: "Pending" | "Approved" | "Rejected";
   students?: string[];
   document?: string;
+  identityDocumentPath?: string | null;
   note?: string;
   accent?: "sky" | "mint" | "rose" | string;
 }

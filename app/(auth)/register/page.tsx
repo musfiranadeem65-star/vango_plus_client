@@ -158,8 +158,15 @@ export default function RegisterPage() {
         status: "Active",
       });
 
+      const userRecord = user as Record<string, unknown>;
+
       // Backend may return the created id under different shapes. Coerce to number.
-      const returnedId = Number(user?.id ?? user?.userId ?? user?.data?.id ?? NaN);
+      const returnedId = Number(
+        userRecord?.id ??
+          userRecord?.userId ??
+          (userRecord?.data as Record<string, unknown> | undefined)?.id ??
+          NaN
+      );
       if (Number.isNaN(returnedId) || !returnedId) {
         throw new Error("User created but backend did not return a valid id.");
       }
@@ -235,9 +242,9 @@ export default function RegisterPage() {
           role: "parent",
           name: form.fullName,
           subscription: {
-            planId: subscription.planId ?? freeTrialPlan.id,
+            planId: Number(subscription.planId ?? freeTrialPlan.id),
             planName: subscription.planName ?? selectedPlan.name,
-            price: subscription.price ?? selectedPlan.price,
+            price: Number(subscription.price ?? selectedPlan.price),
             status: subscription.status ?? "active",
             paymentMethod: subscription.paymentMethod ?? "None",
             startedAt: subscription.startedAt ?? new Date().toISOString(),

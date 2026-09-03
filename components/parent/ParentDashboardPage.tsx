@@ -14,6 +14,7 @@ import {
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AddGuardianDrawer } from "@/components/parent/AddGuardianDrawer";
 import { SubscribePlansModal } from "@/components/parent/SubscribePlansModal";
+import { getActiveParentSubscription } from "@/lib/auth/types";
 import { PARENT_PROFILE } from "@/lib/parent/constants";
 import { formatPkr } from "@/lib/subscription/plans";
 
@@ -173,7 +174,7 @@ function ChildTripCard({
 export default function ParentDashboardPage() {
   const { user, subscribe } = useAuth();
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? PARENT_PROFILE.firstName;
-  const subscription = user?.subscription;
+  const subscription = getActiveParentSubscription(user);
 
   const [children, setChildren] = useState<ChildTrip[]>(initialChildren);
   const [planModalOpen, setPlanModalOpen] = useState(false);
@@ -331,6 +332,9 @@ export default function ParentDashboardPage() {
       <AddGuardianDrawer
         open={guardianDrawerOpen}
         onClose={() => setGuardianDrawerOpen(false)}
+        onSave={async () => {
+          setGuardianDrawerOpen(false);
+        }}
       />
     </div>
   );

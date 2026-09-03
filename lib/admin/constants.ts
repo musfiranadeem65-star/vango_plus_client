@@ -20,7 +20,14 @@ export const ADMIN_PROFILE = {
     "https://lh3.googleusercontent.com/aida-public/AB6AXuB08cUobOp2-1ka4pZ9UNQ2784XogGm0cZBnDwZuSLU5wy67vULd8gUnH8YvlWu73FVnHIdDWMkaFK2-IaPi8MpayVM8P5r5BJjrg1Fx0mH_4chW5SEjlZMlit98_QDfmC6_ztoNezYyGq2Z4_xwNWgUTW0tlglkTwvipzE7PhN-lOIFPOD2U6_5wZs0FdZ1DMHhWApfkzv7QemU5kh9-sppFvUr-tNsmEtk8lR9n8T056PBsCu5qScjut4P6H2zE2pM0rbtZJcK2RS",
 };
 
-export const DASHBOARD_STATS = [
+export const DASHBOARD_STATS: Array<{
+  icon: string;
+  value: string;
+  label: string;
+  tone: "primary" | "secondary" | "tertiary" | "neutral";
+  href: string;
+  badge?: string;
+}> = [
   {
     icon: "group",
     value: "124",

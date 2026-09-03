@@ -1,6 +1,6 @@
 export interface Subscription {
   id: number;
-  parentName: string;
+  parentName?: string;
   studentName?: string;
   planName?: string;
   price?: string | number;

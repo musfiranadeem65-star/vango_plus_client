@@ -16,13 +16,13 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AddGuardianDrawer } from "@/components/parent/AddGuardianDrawer";
+import { getActiveParentSubscription } from "@/lib/auth/types";
 import { getPlanById } from "@/lib/subscription/plans";
 import {
   createStudent,
   getStudentById,
   getStudentsByParentId,
 } from "@/services/studentService";
-import { getUserByEmail } from "@/services/userService";
 import type { Student } from "@/types/student";
 
 type ChildStatus = "active" | "pending";
@@ -94,7 +94,7 @@ function getInitials(name: string): string {
 
 export default function MyChildrenPage() {
   const { user } = useAuth();
-  const subscription = user?.subscription;
+  const subscription = getActiveParentSubscription(user);
   const plan = subscription ? getPlanById(subscription.planId) : undefined;
   const maxChildren = plan?.maxChildren ?? 0;
 
@@ -108,7 +108,6 @@ export default function MyChildrenPage() {
   const [childrenError, setChildrenError] = useState<string | null>(null);
   const [saveChildrenError, setSaveChildrenError] = useState<string | null>(null);
   const [isSavingChild, setIsSavingChild] = useState(false);
-  const [resolvedParentId, setResolvedParentId] = useState<number | null>(null);
 
   const selected = children.find((child) => child.id === selectedId) ?? null;
 
@@ -122,47 +121,14 @@ export default function MyChildrenPage() {
       : "";
 
   useEffect(() => {
-    if (!user?.email) return;
-
-    let isMounted = true;
-    const fetchParentAccount = async () => {
-      setChildrenError(null);
-      setLoadingChildren(true);
-
-      try {
-        const account = await getUserByEmail(user.email);
-        if (!account?.id) {
-          throw new Error("Unable to determine your account. Please refresh and try again.");
-        }
-
-        const role = String(account.role ?? "").trim().toLowerCase();
-        if (role !== "parent") {
-          throw new Error("Unable to determine your account. Please refresh and try again.");
-        }
-
-        if (isMounted) {
-          setResolvedParentId(Number(account.id));
-        }
-      } catch (error) {
-        if (isMounted) {
-          setChildrenError(error instanceof Error ? error.message : "Unable to determine your account. Please refresh and try again.");
-          setResolvedParentId(null);
-        }
-      } finally {
-        if (isMounted) {
-          setLoadingChildren(false);
-        }
-      }
-    };
-
-    void fetchParentAccount();
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.email]);
-
-  useEffect(() => {
-    if (!resolvedParentId) return;
+    console.log("[MyChildrenPage] useEffect triggered, user:", user);
+    const parentUserId = user?.id;
+    console.log("[MyChildrenPage] parentUserId:", parentUserId, "type:", typeof parentUserId);
+    
+    if (typeof parentUserId !== "number") {
+      console.log("[MyChildrenPage] parentUserId is not a number, returning");
+      return;
+    }
 
     let isMounted = true;
     const fetchChildren = async () => {
@@ -170,15 +136,21 @@ export default function MyChildrenPage() {
       setChildrenError(null);
 
       try {
-        const students = await getStudentsByParentId(resolvedParentId);
+        console.log("[MyChildrenPage] Fetching students for parentUserId:", parentUserId);
+        const students = await getStudentsByParentId(parentUserId);
+        console.log("[MyChildrenPage] Students returned from API:", students);
+        
         const mappedChildren = students.map((student, index) =>
           mapStudentToChild(student, accentCycle[index % accentCycle.length])
         );
+        console.log("[MyChildrenPage] Mapped children:", mappedChildren);
+        
         if (isMounted) {
           setChildren(mappedChildren);
           setSelectedId(mappedChildren[0]?.id ?? null);
         }
       } catch (error) {
+        console.error("[MyChildrenPage] Error fetching children:", error);
         if (isMounted) {
           setChildrenError(error instanceof Error ? error.message : "Unable to load children.");
         }
@@ -193,18 +165,18 @@ export default function MyChildrenPage() {
     return () => {
       isMounted = false;
     };
-  }, [resolvedParentId]);
+  }, [user?.id]);
 
   async function handleAddChild() {
     const name = formName.trim();
-    if (!name || !resolvedParentId) return;
+    if (!name || !user?.id || typeof user.id !== "number") return;
 
     setIsSavingChild(true);
     setSaveChildrenError(null);
 
     try {
       const payload = {
-        parentUserId: resolvedParentId,
+        parentUserId: user.id,
         name,
         grade: formGrade.trim() || "Unassigned",
         section: formGrade.trim() || "Unassigned",

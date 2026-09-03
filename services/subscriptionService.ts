@@ -90,7 +90,16 @@ export async function createSubscription(
     return await res.json();
   } catch {
     // If API returns empty body but status 201, return minimal object
-    return { id: 0, planId: payload.planId, userId: payload.userId, planName: payload.planName, price: payload.price, status: payload.status, paymentMethod: payload.paymentMethod, startedAt: payload.startedAt } as Subscription;
+    return {
+      id: 0,
+      planId: payload.planId,
+      userId: payload.userId,
+      planName: payload.planName,
+      price: payload.price,
+      status: payload.status,
+      paymentMethod: payload.paymentMethod,
+      startedAt: payload.startedAt,
+    } as unknown as Subscription;
   }
 }
 

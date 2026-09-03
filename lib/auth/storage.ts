@@ -1,8 +1,11 @@
 import { AUTH_TOKEN_KEY, AUTH_USER_KEY } from "./constants";
-import type { AuthUser } from "./types";
+import { normalizeAuthUser, type AuthUser } from "./types";
 
 export function saveAuthSession(user: AuthUser, rememberMe: boolean): void {
   if (typeof window === "undefined") return;
+
+  const normalized = normalizeAuthUser(user);
+  if (!normalized) return;
 
   const storage = rememberMe ? localStorage : sessionStorage;
   const other = rememberMe ? sessionStorage : localStorage;
@@ -12,7 +15,7 @@ export function saveAuthSession(user: AuthUser, rememberMe: boolean): void {
   other.removeItem(AUTH_USER_KEY);
 
   storage.setItem(AUTH_TOKEN_KEY, "demo-jwt-token");
-  storage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  storage.setItem(AUTH_USER_KEY, JSON.stringify(normalized));
 }
 
 export function getAuthSession(): AuthUser | null {
@@ -26,7 +29,7 @@ export function getAuthSession(): AuthUser | null {
   if (!raw || !token) return null;
 
   try {
-    return JSON.parse(raw) as AuthUser;
+    return normalizeAuthUser(JSON.parse(raw) as AuthUser);
   } catch {
     return null;
   }

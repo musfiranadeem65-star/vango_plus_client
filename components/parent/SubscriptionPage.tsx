@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { SubscribePlansModal } from "@/components/parent/SubscribePlansModal";
+import { getActiveParentSubscription } from "@/lib/auth/types";
 import {
   formatPkr,
   getPlanById,
@@ -43,7 +44,7 @@ const perks = [
 
 export default function SubscriptionPage() {
   const { user, subscribe } = useAuth();
-  const subscription = user?.subscription;
+  const subscription = getActiveParentSubscription(user);
   const currentPlan = subscription ? getPlanById(subscription.planId) : undefined;
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | undefined>();

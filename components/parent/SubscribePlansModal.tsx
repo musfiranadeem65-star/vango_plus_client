@@ -13,7 +13,7 @@ interface SubscribePlansModalProps {
   open: boolean;
   onClose: () => void;
   onSubscribe: (subscription: ParentSubscription) => Promise<{ error?: string }>;
-  currentPlanId?: string;
+  currentPlanId?: string | number;
   initialPlanId?: string;
 }
 

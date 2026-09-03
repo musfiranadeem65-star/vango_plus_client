@@ -9,6 +9,7 @@ interface GuardianFormData {
   relation: string;
   phone: string;
   note?: string;
+  identityDocument?: File | null;
 }
 
 interface AddGuardianDrawerProps {
@@ -32,6 +33,8 @@ export function AddGuardianDrawer({
   const [relation, setRelation] = useState(guardian?.relation ?? "");
   const [phone, setPhone] = useState(guardian?.phone ?? "");
   const [note, setNote] = useState(guardian?.note ?? "");
+  const [identityDocument, setIdentityDocument] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -39,17 +42,48 @@ export function AddGuardianDrawer({
     setRelation(guardian?.relation ?? "");
     setPhone(guardian?.phone ?? "");
     setNote(guardian?.note ?? "");
+    setIdentityDocument(null);
+    setFileError(null);
   }, [open, guardian]);
 
   if (!open) return null;
 
   const handleSave = async () => {
+    if (identityDocument && identityDocument.size > 5 * 1024 * 1024) {
+      setFileError("Identity document must be 5 MB or smaller.");
+      return;
+    }
+
     await onSave({
       name: name.trim(),
       relation: relation.trim(),
       phone: phone.trim(),
       note: note.trim(),
+      identityDocument,
     });
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    const fileExtension = file.name.split(".").pop()?.toLowerCase();
+    if (!fileExtension || !["jpg", "jpeg", "png", "pdf"].includes(fileExtension)) {
+      setIdentityDocument(null);
+      setFileError("Please select a JPG, JPEG, PNG, or PDF file.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setIdentityDocument(null);
+      setFileError("Identity document must be 5 MB or smaller.");
+      event.target.value = "";
+      return;
+    }
+
+    setIdentityDocument(file);
+    setFileError(null);
   };
 
   return (
@@ -124,15 +158,21 @@ export function AddGuardianDrawer({
             <label className="font-[family-name:var(--font-inter)] text-sm font-semibold text-foreground">
               Identity Document (Driver&apos;s License or ID)
             </label>
-            <div className="mt-2 flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-bright px-4 py-8 text-center">
+            <label className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-bright px-4 py-8 text-center">
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png,.pdf"
+                onChange={handleFileChange}
+                className="sr-only"
+              />
               <UploadCloud size={26} className="text-muted" />
               <p className="text-sm font-semibold text-foreground">
-                Click to upload or drag &amp; drop
+                {identityDocument ? `Selected: ${identityDocument.name}` : "Click to upload or drag & drop"}
               </p>
               <p className="font-[family-name:var(--font-inter)] text-xs font-medium text-on-surface-variant">
-                JPG, PNG or PDF (max 5MB)
+                JPG, JPEG, PNG or PDF (max 5MB)
               </p>
-            </div>
+            </label>
           </div>
 
           <div className="flex items-start gap-2 rounded-xl bg-surface-bright p-3">
@@ -144,9 +184,9 @@ export function AddGuardianDrawer({
           </div>
         </form>
 
-        {error ? (
+        {fileError || error ? (
           <div className="px-6 pb-3 text-sm font-medium text-red-700">
-            {error}
+            {fileError ?? error}
           </div>
         ) : null}
 

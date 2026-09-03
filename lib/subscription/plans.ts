@@ -54,8 +54,17 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   },
 ];
 
-export function getPlanById(id: string): SubscriptionPlan | undefined {
-  return SUBSCRIPTION_PLANS.find((plan) => plan.id === id);
+export function getPlanById(id: string | number | undefined): SubscriptionPlan | undefined {
+  if (id === undefined || id === null) return undefined;
+
+  const normalized = String(id).trim().toLowerCase();
+  return (
+    SUBSCRIPTION_PLANS.find((plan) => String(plan.id).trim().toLowerCase() === normalized) ??
+    SUBSCRIPTION_PLANS.find((plan) =>
+      plan.name.trim().toLowerCase() === normalized ||
+      plan.name.trim().toLowerCase() === normalized.replace(/\s+/g, " ")
+    )
+  );
 }
 
 export function formatPkr(amount: number): string {

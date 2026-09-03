@@ -19,7 +19,7 @@ export async function getDrivers(): Promise<Driver[]> {
 }
 
 export async function getDriverById(id: number): Promise<Driver> {
-  const response = await fetch(`${API_BASE_URL}/api/Driver/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/api/drivers/${id}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",

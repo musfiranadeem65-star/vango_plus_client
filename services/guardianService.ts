@@ -9,6 +9,40 @@ export interface GuardianPayload {
   phone?: string;
   status: Guardian["status"];
   note?: string;
+  identityDocument?: File | null;
+}
+
+function toGuardianFormData(payload: GuardianPayload): FormData {
+  const formData = new FormData();
+  formData.append("userId", String(payload.userId));
+  formData.append("name", payload.name);
+  formData.append("relation", payload.relation ?? "");
+  formData.append("phone", payload.phone ?? "");
+  formData.append("status", payload.status);
+  formData.append("note", payload.note ?? "");
+  if (payload.identityDocument) {
+    formData.append("identityDocument", payload.identityDocument);
+  }
+  return formData;
+}
+
+async function getGuardianErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const body = await response.json();
+    if (typeof body?.message === "string") return body.message;
+    if (typeof body?.title === "string") return body.title;
+
+    if (body?.errors && typeof body.errors === "object") {
+      const messages = Object.values(body.errors).flatMap((value) =>
+        Array.isArray(value) ? value : [value]
+      );
+      const firstMessage = messages.find((value) => typeof value === "string");
+      if (firstMessage) return firstMessage;
+    }
+  } catch {
+    // The response may not contain JSON.
+  }
+  return fallback;
 }
 
 export async function getGuardians(): Promise<Guardian[]> {
@@ -28,19 +62,11 @@ export async function getGuardians(): Promise<Guardian[]> {
 export async function createGuardian(payload: GuardianPayload): Promise<Guardian> {
   const res = await fetch(`${API_BASE_URL}/api/Guardian`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: toGuardianFormData(payload),
   });
 
   if (res.status !== 201 && res.status !== 200) {
-    let errorMessage = "Unable to create guardian.";
-    try {
-      const body = await res.json();
-      if (body?.message) errorMessage = body.message;
-    } catch {
-      // ignore
-    }
-    throw new Error(errorMessage);
+    throw new Error(await getGuardianErrorMessage(res, "Unable to create guardian."));
   }
 
   return res.json();
@@ -49,19 +75,11 @@ export async function createGuardian(payload: GuardianPayload): Promise<Guardian
 export async function updateGuardian(id: number, payload: GuardianPayload): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/Guardian/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: toGuardianFormData(payload),
   });
 
   if (res.status !== 204 && res.status !== 200) {
-    let errorMessage = "Unable to update guardian.";
-    try {
-      const body = await res.json();
-      if (body?.message) errorMessage = body.message;
-    } catch {
-      // ignore
-    }
-    throw new Error(errorMessage);
+    throw new Error(await getGuardianErrorMessage(res, "Unable to update guardian."));
   }
 }
 

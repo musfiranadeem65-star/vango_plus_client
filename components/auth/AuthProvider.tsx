@@ -11,7 +11,6 @@ import {
 } from "react";
 import { ROLE_ROUTES } from "@/lib/auth/constants";
 import {
-  authenticate,
   registerUser,
   updateSubscription,
 } from "@/lib/auth/mock-auth";
@@ -21,10 +20,12 @@ import {
   saveAuthSession,
   updateStoredUser,
 } from "@/lib/auth/storage";
-import type {
-  AuthUser,
-  ParentSubscription,
-  RegisterFormData,
+import {
+  normalizeAuthUser,
+  type AuthUser,
+  type ParentSubscription,
+  type RegisterFormData,
+  type UserRole,
 } from "@/lib/auth/types";
 
 interface AuthContextValue {
@@ -78,19 +79,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string, rememberMe: boolean) => {
-      const result = await authenticate(email, password);
-      if (result.error || !result.user) {
-        return { error: result.error ?? "Unable to sign in." };
-      }
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://localhost:7270";
 
-      const normalizedUser = {
-        ...result.user,
-        role: normalizeRole(result.user.role) ?? result.user.role,
-      };
-      saveAuthSession(normalizedUser, rememberMe);
-      setSession({ user: normalizedUser, isLoading: false });
-      router.push(ROLE_ROUTES[normalizedUser.role]);
-      return {};
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/User/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const responseBody = response.headers
+          .get("content-type")
+          ?.includes("application/json")
+          ? await response.json()
+          : null;
+
+        if (response.ok) {
+          const backendUser =
+            responseBody && typeof responseBody === "object"
+              ? (responseBody as Record<string, unknown>)
+              : null;
+
+          console.log("[AuthProvider.login] Backend response:", responseBody);
+          console.log("[AuthProvider.login] backendUser.id:", backendUser?.id, "type:", typeof backendUser?.id);
+
+          if (!backendUser || typeof backendUser.email !== "string") {
+            return { error: "Unable to sign in." };
+          }
+
+          const frontendRole = normalizeRole(
+            typeof backendUser.role === "string" ? backendUser.role : undefined
+          );
+
+          if (!frontendRole) {
+            return {
+              error: "Unable to sign in. Account role is not supported.",
+            };
+          }
+
+          const normalizedUser =
+            normalizeAuthUser({
+              ...backendUser,
+              email: backendUser.email,
+              role: frontendRole,
+              name: typeof backendUser.name === "string" ? backendUser.name : undefined,
+              id: typeof backendUser.id === "number" ? backendUser.id : undefined,
+            }) ?? {
+              email: backendUser.email,
+              role: frontendRole,
+              name: typeof backendUser.name === "string" ? backendUser.name : undefined,
+              id: typeof backendUser.id === "number" ? backendUser.id : undefined,
+            };
+
+          console.log("[AuthProvider.login] normalizedUser:", normalizedUser);
+          saveAuthSession(normalizedUser, rememberMe);
+          setSession({ user: normalizedUser, isLoading: false });
+          router.push(ROLE_ROUTES[normalizedUser.role]);
+          return {};
+        }
+
+        if (response.status === 401) {
+          const message =
+            responseBody && typeof responseBody === "object" &&
+            typeof (responseBody as Record<string, unknown>).message === "string"
+              ? String((responseBody as Record<string, unknown>).message)
+              : "Invalid email or password.";
+          return { error: message };
+        }
+
+        const message =
+          responseBody && typeof responseBody === "object" &&
+          typeof (responseBody as Record<string, unknown>).message === "string"
+            ? String((responseBody as Record<string, unknown>).message)
+            : "Unable to connect to the server. Please try again.";
+        return { error: message };
+      } catch {
+        return { error: "Unable to connect to the server. Please try again." };
+      }
     },
     [router]
   );
@@ -102,7 +169,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: result.error ?? "Unable to create account." };
       }
 
-      const normalizedUser = {
+      const normalizedUser = normalizeAuthUser({
+        ...result.user,
+        role: normalizeRole(result.user.role) ?? result.user.role,
+      }) ?? {
         ...result.user,
         role: normalizeRole(result.user.role) ?? result.user.role,
       };

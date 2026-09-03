@@ -281,7 +281,7 @@ export function DriversManagementPage() {
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">License No.</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-700">{driver.license}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-700">{driver.licenseNo}</p>
                   </div>
                 </div>
 
