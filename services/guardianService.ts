@@ -12,6 +12,20 @@ export interface GuardianPayload {
   identityDocument?: File | null;
 }
 
+function normalizeGuardian(guardian: Guardian): Guardian {
+  const status = String(guardian.status ?? "").toLowerCase();
+
+  return {
+    ...guardian,
+    status:
+      status === "approved"
+        ? "Approved"
+        : status === "rejected"
+          ? "Rejected"
+          : "Pending",
+  };
+}
+
 function toGuardianFormData(payload: GuardianPayload): FormData {
   const formData = new FormData();
   formData.append("userId", String(payload.userId));
@@ -56,7 +70,8 @@ export async function getGuardians(): Promise<Guardian[]> {
     throw new Error("Unable to load guardians from the backend.");
   }
 
-  return res.json();
+  const guardians: Guardian[] = await res.json();
+  return guardians.map(normalizeGuardian);
 }
 
 export async function createGuardian(payload: GuardianPayload): Promise<Guardian> {
@@ -69,7 +84,8 @@ export async function createGuardian(payload: GuardianPayload): Promise<Guardian
     throw new Error(await getGuardianErrorMessage(res, "Unable to create guardian."));
   }
 
-  return res.json();
+  const guardian: Guardian = await res.json();
+  return normalizeGuardian(guardian);
 }
 
 export async function updateGuardian(id: number, payload: GuardianPayload): Promise<void> {

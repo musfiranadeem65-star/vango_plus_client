@@ -1,5 +1,5 @@
 import type { Student } from "@/types/student";
-import type { RouteStop } from "@/types/route";
+import type { Route, RouteStop } from "@/types/route";
 import type { StudentSchedule } from "@/types/schedule";
 
 const API_BASE_URL = "https://localhost:7270";
@@ -78,16 +78,25 @@ export async function getStudentsByParentId(parentUserId: number): Promise<Stude
 }
 
 export async function getStudentById(id: number): Promise<Student> {
-  const response = await fetch(`${API_BASE_URL}/api/Student/${id}`, {
+  const endpoint = `${API_BASE_URL}/api/Student/${id}`;
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
     },
     cache: "no-store",
-  });
+    });
+  } catch (error) {
+    console.error("[studentService] API error", { endpoint, status: "NETWORK_ERROR", body: error });
+    throw error;
+  }
 
   if (!response.ok) {
-    throw new Error(`Unable to load student ${id}.`);
+    const body = await response.text();
+    console.error("[studentService] API error", { endpoint, status: response.status, body });
+    throw new Error(`Unable to load student ${id}. Status: ${response.status}`);
   }
 
   return response.json();
@@ -263,4 +272,140 @@ export async function updateStudent(id: number, payload: StudentUpdatePayload): 
     }
     throw new Error(errorMessage);
   }
+}
+
+export interface StudentRouteAssignment {
+  id: number;
+  studentId: number;
+  routeId: number;
+  pickupTime: string;
+  dropoffTime: string;
+  assignedAt: string;
+  status: string;
+}
+
+export async function getStudentRouteAssignments(): Promise<StudentRouteAssignment[]> {
+  const endpoint = `${API_BASE_URL}/api/student-route-assignments`;
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    });
+  } catch (error) {
+    console.error("[studentService] API error", { endpoint, status: "NETWORK_ERROR", body: error });
+    throw error;
+  }
+
+  if (!response.ok) {
+    const body = await response.text();
+    console.error("[studentService] API error", { endpoint, status: response.status, body });
+    throw new Error(`Unable to load student route assignments. Status: ${response.status}`);
+  }
+
+  const body = await response.json();
+  return Array.isArray(body) ? body : [];
+}
+
+export interface RouteDetail extends Route {
+  routeStops?: RouteStop[];
+}
+
+export async function getRouteDetails(routeId: number): Promise<RouteDetail> {
+  const endpoint = `${API_BASE_URL}/api/route/${routeId}`;
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    });
+  } catch (error) {
+    console.error("[studentService] API error", { endpoint, status: "NETWORK_ERROR", body: error });
+    throw error;
+  }
+
+  if (!response.ok) {
+    const body = await response.text();
+    console.error("[studentService] API error", { endpoint, status: response.status, body });
+    throw new Error(`Unable to load route details. Status: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export interface DriverDetail {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  licenseNo: string;
+  status: string;
+}
+
+export async function getDriverDetails(driverId: number): Promise<DriverDetail> {
+  const endpoint = `${API_BASE_URL}/api/driver/${driverId}`;
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    });
+  } catch (error) {
+    console.error("[studentService] API error", { endpoint, status: "NETWORK_ERROR", body: error });
+    throw error;
+  }
+
+  if (!response.ok) {
+    const body = await response.text();
+    console.error("[studentService] API error", { endpoint, status: response.status, body });
+    throw new Error(`Unable to load driver details. Status: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export interface GuardianDetail {
+  id: number;
+  userId: number;
+  name: string;
+  relation: string;
+  phone: string;
+  status: string;
+  note?: string;
+  identityDocumentPath?: string | null;
+}
+
+export async function getStudentGuardians(studentId: number): Promise<GuardianDetail[]> {
+  const endpoint = `${API_BASE_URL}/api/students/${studentId}/guardians`;
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    });
+  } catch (error) {
+    console.error("[studentService] API error", { endpoint, status: "NETWORK_ERROR", body: error });
+    throw error;
+  }
+
+  if (!response.ok) {
+    const body = await response.text();
+    console.error("[studentService] API error", { endpoint, status: response.status, body });
+    throw new Error(`Unable to load guardians. Status: ${response.status}`);
+  }
+
+  const body = await response.json();
+  return Array.isArray(body) ? body : [];
 }
