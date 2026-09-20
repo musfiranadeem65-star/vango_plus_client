@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ParentMobileNav } from "@/components/parent/ParentMobileNav";
 import { ParentSidebar } from "@/components/parent/ParentSidebar";
 import { ParentTopNavbar } from "@/components/parent/ParentTopNavbar";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 import { cn } from "@/lib/utils";
 
 export function ParentShell({ children }: { children: React.ReactNode }) {
@@ -38,6 +39,8 @@ export function ParentShell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 px-4 pb-28 pt-6 md:px-10 md:pb-10">{children}</main>
         <ParentMobileNav />
       </div>
+
+      <ChatWidget />
     </div>
   );
 }
