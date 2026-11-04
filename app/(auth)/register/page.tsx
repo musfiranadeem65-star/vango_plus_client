@@ -12,7 +12,7 @@ import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { StepIndicator } from "@/components/ui/StepIndicator";
 import type { RegisterFormData } from "@/lib/auth/types";
 import { ROLE_ROUTES } from "@/lib/auth/constants";
-import { saveAuthSession } from "@/lib/auth/storage";
+import { saveAuthSession, saveAuthToken } from "@/lib/auth/storage";
 import { formatPkr } from "@/lib/subscription/plans";
 import {
   getPasswordStrength,
@@ -21,7 +21,7 @@ import {
   validatePassword,
   validateRequired,
 } from "@/lib/auth/validation";
-import { createUser } from "@/services/userService";
+import { createUser, signIn } from "@/services/userService";
 import {
   createSubscription,
   getSubscriptionPlans,
@@ -68,6 +68,7 @@ export default function RegisterPage() {
   const [formError, setFormError] = useState<string | undefined>();
   const [planError, setPlanError] = useState<string | undefined>();
   const [createdUserId, setCreatedUserId] = useState<number | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [freeTrialPlan, setFreeTrialPlan] = useState<SubscriptionPlan | null>(null);
   const isSubmitting = isCreatingSubscription || isCreatingUser;
 
@@ -170,6 +171,22 @@ export default function RegisterPage() {
       if (Number.isNaN(returnedId) || !returnedId) {
         throw new Error("User created but backend did not return a valid id.");
       }
+      // Creating the account does not sign anyone in, and the plan step
+      // below calls endpoints that now require a token. Sign in here so the
+      // rest of the signup works.
+      const token = await signIn(form.email, form.password);
+
+      if (!token) {
+        throw new Error(
+          "Your account was created but we could not sign you in. Please sign in and choose a plan."
+        );
+      }
+
+      // Into storage straight away: the plan step's requests read the token
+      // from there, not from React state.
+      saveAuthToken(token, true);
+      setAuthToken(token);
+
       setCreatedUserId(returnedId);
       setStep(3);
     } catch (error) {
@@ -250,7 +267,8 @@ export default function RegisterPage() {
             startedAt: subscription.startedAt ?? new Date().toISOString(),
           },
         },
-        true
+        true,
+        authToken ?? ""
       );
 
       router.push(ROLE_ROUTES.parent);

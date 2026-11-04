@@ -1,3 +1,5 @@
+import { authFetch } from "@/lib/api/authFetch";
+
 import type { Student } from "@/types/student";
 import type { Route, RouteStop } from "@/types/route";
 import type { StudentSchedule } from "@/types/schedule";
@@ -5,7 +7,7 @@ import type { StudentSchedule } from "@/types/schedule";
 const API_BASE_URL = "https://localhost:7270";
 
 export async function getStudents(): Promise<Student[]> {
-  const response = await fetch(`${API_BASE_URL}/api/Student`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Student`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -26,7 +28,7 @@ export async function getStudentsByParentId(parentUserId: number): Promise<Stude
   
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await authFetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -81,7 +83,7 @@ export async function getStudentById(id: number): Promise<Student> {
   const endpoint = `${API_BASE_URL}/api/Student/${id}`;
   let response: Response;
   try {
-    response = await fetch(endpoint, {
+    response = await authFetch(endpoint, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -188,7 +190,7 @@ function normalizeStops(value: unknown): RouteStop[] {
 }
 
 export async function getStudentSchedule(id: number): Promise<StudentSchedule> {
-  const response = await fetch(`${API_BASE_URL}/api/students/${id}/schedule`, {
+  const response = await authFetch(`${API_BASE_URL}/api/students/${id}/schedule`, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
@@ -227,7 +229,7 @@ interface StudentUpdatePayload {
 }
 
 export async function createStudent(payload: StudentCreatePayload): Promise<Student> {
-  const response = await fetch(`${API_BASE_URL}/api/Student`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Student`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -252,7 +254,7 @@ export async function createStudent(payload: StudentCreatePayload): Promise<Stud
 }
 
 export async function updateStudent(id: number, payload: StudentUpdatePayload): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/Student/${id}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Student/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -288,7 +290,7 @@ export async function getStudentRouteAssignments(): Promise<StudentRouteAssignme
   const endpoint = `${API_BASE_URL}/api/student-route-assignments`;
   let response: Response;
   try {
-    response = await fetch(endpoint, {
+    response = await authFetch(endpoint, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -318,7 +320,7 @@ export async function getRouteDetails(routeId: number): Promise<RouteDetail> {
   const endpoint = `${API_BASE_URL}/api/route/${routeId}`;
   let response: Response;
   try {
-    response = await fetch(endpoint, {
+    response = await authFetch(endpoint, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -352,7 +354,7 @@ export async function getDriverDetails(driverId: number): Promise<DriverDetail> 
   const endpoint = `${API_BASE_URL}/api/driver/${driverId}`;
   let response: Response;
   try {
-    response = await fetch(endpoint, {
+    response = await authFetch(endpoint, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -388,7 +390,7 @@ export async function getStudentGuardians(studentId: number): Promise<GuardianDe
   const endpoint = `${API_BASE_URL}/api/students/${studentId}/guardians`;
   let response: Response;
   try {
-    response = await fetch(endpoint, {
+    response = await authFetch(endpoint, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",

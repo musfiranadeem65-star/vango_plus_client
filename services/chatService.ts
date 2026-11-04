@@ -1,3 +1,5 @@
+import { authFetch } from "@/lib/api/authFetch";
+
 const API_BASE_URL = "https://localhost:7270";
 
 export interface ChatResponse {
@@ -7,16 +9,20 @@ export interface ChatResponse {
   escalated: boolean;
 }
 
-export async function askChatbot(
-  parentUserId: number,
-  message: string
-): Promise<ChatResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/chat`, {
+/**
+ * Asks the parent assistant one question.
+ *
+ * Which parent is asking is taken from the signed-in token on the server, so
+ * it is deliberately not sent in the body. A caller cannot ask about somebody
+ * else's children.
+ */
+export async function askChatbot(message: string): Promise<ChatResponse> {
+  const response = await authFetch(`${API_BASE_URL}/api/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ parentUserId, message }),
+    body: JSON.stringify({ message }),
     cache: "no-store",
   });
 

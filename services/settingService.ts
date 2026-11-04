@@ -1,3 +1,5 @@
+import { authFetch } from "@/lib/api/authFetch";
+
 const API_BASE_URL = "https://localhost:7270";
 
 export interface SchoolSetting {
@@ -18,7 +20,7 @@ export interface UpdateSchoolSettingPayload {
 }
 
 export async function getSchoolSettings(): Promise<SchoolSetting> {
-  const response = await fetch(`${API_BASE_URL}/api/school-settings`, {
+  const response = await authFetch(`${API_BASE_URL}/api/school-settings`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -36,7 +38,7 @@ export async function getSchoolSettings(): Promise<SchoolSetting> {
 export async function updateSchoolSettings(
   payload: UpdateSchoolSettingPayload
 ): Promise<SchoolSetting> {
-  const response = await fetch(`${API_BASE_URL}/api/school-settings`, {
+  const response = await authFetch(`${API_BASE_URL}/api/school-settings`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -65,7 +67,7 @@ export interface ChangePasswordPayload {
 export async function changeUserPassword(
   payload: ChangePasswordPayload
 ): Promise<void> {
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE_URL}/api/User/change-password`,
     {
       method: "POST",

@@ -28,6 +28,34 @@ import {
   type UserRole,
 } from "@/lib/auth/types";
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "https://localhost:7270";
+
+/**
+ * Signs in and returns the token, or null when the credentials are refused.
+ * Used after registration, where the account exists but the session does not
+ * have a token yet.
+ */
+async function fetchLoginToken(
+  email: string,
+  password: string
+): Promise<string | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/User/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) return null;
+
+    const body = (await response.json()) as { token?: unknown };
+    return typeof body.token === "string" && body.token ? body.token : null;
+  } catch {
+    return null;
+  }
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
@@ -79,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string, rememberMe: boolean) => {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://localhost:7270";
+      const apiBaseUrl = API_BASE_URL;
 
       try {
         const response = await fetch(`${apiBaseUrl}/api/User/login`, {
@@ -102,11 +130,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               ? (responseBody as Record<string, unknown>)
               : null;
 
-          console.log("[AuthProvider.login] Backend response:", responseBody);
-          console.log("[AuthProvider.login] backendUser.id:", backendUser?.id, "type:", typeof backendUser?.id);
-
           if (!backendUser || typeof backendUser.email !== "string") {
             return { error: "Unable to sign in." };
+          }
+
+          // Every later request has to carry this, so a sign-in without one
+          // is not a sign-in.
+          const token =
+            typeof backendUser.token === "string" ? backendUser.token : "";
+
+          if (!token) {
+            return { error: "Unable to sign in. The server did not return a token." };
           }
 
           const frontendRole = normalizeRole(
@@ -133,8 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               id: typeof backendUser.id === "number" ? backendUser.id : undefined,
             };
 
-          console.log("[AuthProvider.login] normalizedUser:", normalizedUser);
-          saveAuthSession(normalizedUser, rememberMe);
+          saveAuthSession(normalizedUser, rememberMe, token);
           setSession({ user: normalizedUser, isLoading: false });
           router.push(ROLE_ROUTES[normalizedUser.role]);
           return {};
@@ -176,7 +209,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...result.user,
         role: normalizeRole(result.user.role) ?? result.user.role,
       };
-      saveAuthSession(normalizedUser, true);
+      // Creating the account does not sign anyone in. Sign in now so the
+      // session carries a real token, otherwise the very next request the
+      // new parent makes comes back as 401.
+      const token = await fetchLoginToken(form.email, form.password);
+
+      if (!token) {
+        return {
+          error: "Your account was created. Please sign in to continue.",
+        };
+      }
+
+      saveAuthSession(normalizedUser, true, token);
       setSession({ user: normalizedUser, isLoading: false });
       router.push(ROLE_ROUTES[normalizedUser.role]);
       return {};

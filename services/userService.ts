@@ -1,3 +1,5 @@
+import { authFetch } from "@/lib/api/authFetch";
+
 const API_BASE_URL = "https://localhost:7270";
 
 export interface UserCreateRequest {
@@ -23,7 +25,7 @@ export interface UserCreateResponse {
 export async function createUser(
   payload: UserCreateRequest
 ): Promise<UserCreateResponse> {
-  const res = await fetch(`${API_BASE_URL}/api/User`, {
+  const res = await authFetch(`${API_BASE_URL}/api/User`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -127,14 +129,14 @@ export async function getUserByEmail(email: string): Promise<UserResponse> {
     return null;
   }
 
-  let user = await parseResponse(await fetch(queryUrl, {
+  let user = await parseResponse(await authFetch(queryUrl, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
   }));
 
   if (!user) {
-    user = await parseResponse(await fetch(fallbackUrl, {
+    user = await parseResponse(await authFetch(fallbackUrl, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
@@ -146,4 +148,30 @@ export async function getUserByEmail(email: string): Promise<UserResponse> {
   }
 
   return user;
+}
+
+/**
+ * Signs in and returns the token, or null when the credentials are refused.
+ *
+ * The register page uses this: creating an account does not sign anyone in,
+ * and every endpoint after that step requires a token.
+ */
+export async function signIn(
+  email: string,
+  password: string
+): Promise<string | null> {
+  try {
+    const res = await authFetch(`${API_BASE_URL}/api/User/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) return null;
+
+    const body = (await res.json()) as { token?: unknown };
+    return typeof body.token === "string" && body.token ? body.token : null;
+  } catch {
+    return null;
+  }
 }

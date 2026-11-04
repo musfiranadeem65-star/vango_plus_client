@@ -43,10 +43,10 @@ export function ChatWidget() {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
 
-    // The backend takes the parent id in the body because auth is still mocked.
-    // Replace this with the session's user id once real auth lands.
-    const parentUserId = user?.id;
-    if (!parentUserId) {
+    // The server reads the parent from the signed-in token, so nothing is
+    // sent here to say who is asking. This only checks that there is a
+    // session at all, to give a clearer message than a 401 would.
+    if (!user?.id) {
       setMessages((prev) => [
         ...prev,
         { id: nextId.current++, role: "user", text: trimmed },
@@ -68,7 +68,7 @@ export function ChatWidget() {
     setSending(true);
 
     try {
-      const reply = await askChatbot(parentUserId, trimmed);
+      const reply = await askChatbot(trimmed);
       setMessages((prev) => [
         ...prev,
         {

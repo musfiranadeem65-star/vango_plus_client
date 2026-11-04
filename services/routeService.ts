@@ -1,9 +1,11 @@
+import { authFetch } from "@/lib/api/authFetch";
+
 import type { Route, RouteStop } from "@/types/route";
 
 const API_BASE_URL = "https://localhost:7270";
 
 export async function getRoutes(): Promise<Route[]> {
-  const response = await fetch(`${API_BASE_URL}/api/Route`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Route`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -19,7 +21,7 @@ export async function getRoutes(): Promise<Route[]> {
 }
 
 export async function getRouteById(id: number): Promise<Route> {
-  const response = await fetch(`${API_BASE_URL}/api/Route/${id}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Route/${id}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -35,7 +37,7 @@ export async function getRouteById(id: number): Promise<Route> {
 }
 
 export async function getRouteStops(id: number): Promise<RouteStop[]> {
-  const response = await fetch(`${API_BASE_URL}/api/routes/${id}/stops`, {
+  const response = await authFetch(`${API_BASE_URL}/api/routes/${id}/stops`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -77,7 +79,7 @@ export interface RoutePayload {
 }
 
 export async function createRoute(payload: RoutePayload): Promise<Route> {
-  const response = await fetch(`${API_BASE_URL}/api/Route`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Route`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -108,7 +110,7 @@ export async function updateRoute(
   id: number,
   payload: RoutePayload
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/Route/${id}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Route/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -134,7 +136,7 @@ export async function updateRoute(
 }
 
 export async function deleteRoute(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/Route/${id}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Route/${id}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -150,7 +152,7 @@ export async function updateRouteStatus(
   id: number,
   status: RoutePayload["status"]
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/Route/${id}/status`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Route/${id}/status`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -203,7 +205,7 @@ export interface StudentRouteAssignment {
 export async function assignStudentToRoute(
   payload: StudentRouteAssignmentPayload
 ): Promise<StudentRouteAssignment> {
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE_URL}/api/student-route-assignments`,
     {
       method: "POST",
@@ -234,7 +236,7 @@ export async function assignStudentToRoute(
 export async function getStudentRouteAssignments(): Promise<
   StudentRouteAssignment[]
 > {
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE_URL}/api/student-route-assignments`,
     {
       method: "GET",
@@ -274,7 +276,7 @@ export async function updateStudentRouteAssignment(
   id: number,
   payload: StudentRouteAssignmentPayload
 ): Promise<void> {
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE_URL}/api/student-route-assignments/${id}`,
     {
       method: "PUT",
@@ -299,7 +301,7 @@ export async function updateStudentRouteAssignment(
 export async function deleteStudentRouteAssignment(
   id: number
 ): Promise<void> {
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE_URL}/api/student-route-assignments/${id}`,
     {
       method: "DELETE",

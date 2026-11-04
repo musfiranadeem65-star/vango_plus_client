@@ -1,3 +1,5 @@
+import { authFetch } from "@/lib/api/authFetch";
+
 import type { Guardian, GuardianStatusPayload } from "@/types/guardian";
 
 const API_BASE_URL = "https://localhost:7270";
@@ -60,7 +62,7 @@ async function getGuardianErrorMessage(response: Response, fallback: string): Pr
 }
 
 export async function getGuardians(): Promise<Guardian[]> {
-  const res = await fetch(`${API_BASE_URL}/api/Guardian`, {
+  const res = await authFetch(`${API_BASE_URL}/api/Guardian`, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
@@ -75,7 +77,7 @@ export async function getGuardians(): Promise<Guardian[]> {
 }
 
 export async function createGuardian(payload: GuardianPayload): Promise<Guardian> {
-  const res = await fetch(`${API_BASE_URL}/api/Guardian`, {
+  const res = await authFetch(`${API_BASE_URL}/api/Guardian`, {
     method: "POST",
     body: toGuardianFormData(payload),
   });
@@ -89,7 +91,7 @@ export async function createGuardian(payload: GuardianPayload): Promise<Guardian
 }
 
 export async function updateGuardian(id: number, payload: GuardianPayload): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/Guardian/${id}`, {
+  const res = await authFetch(`${API_BASE_URL}/api/Guardian/${id}`, {
     method: "PUT",
     body: toGuardianFormData(payload),
   });
@@ -100,7 +102,7 @@ export async function updateGuardian(id: number, payload: GuardianPayload): Prom
 }
 
 export async function deleteGuardian(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/Guardian/${id}`, {
+  const res = await authFetch(`${API_BASE_URL}/api/Guardian/${id}`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
   });
@@ -118,7 +120,7 @@ export async function deleteGuardian(id: number): Promise<void> {
 }
 
 export async function updateGuardianStatus(id: number, payload: GuardianStatusPayload): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/Guardian/${id}/status`, {
+  const res = await authFetch(`${API_BASE_URL}/api/Guardian/${id}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

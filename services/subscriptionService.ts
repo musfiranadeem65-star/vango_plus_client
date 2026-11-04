@@ -1,3 +1,5 @@
+import { authFetch } from "@/lib/api/authFetch";
+
 import type { Subscription, SubscriptionStatusPayload } from "@/types/subscription";
 
 const API_BASE_URL = "https://localhost:7270";
@@ -22,7 +24,7 @@ export interface SubscriptionCreatePayload {
 }
 
 export async function getSubscriptions(): Promise<Subscription[]> {
-  const res = await fetch(`${API_BASE_URL}/api/subscriptions`, {
+  const res = await authFetch(`${API_BASE_URL}/api/subscriptions`, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
@@ -36,7 +38,7 @@ export async function getSubscriptions(): Promise<Subscription[]> {
 }
 
 export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
-  const res = await fetch(`${API_BASE_URL}/api/subscription/plans`, {
+  const res = await authFetch(`${API_BASE_URL}/api/subscription/plans`, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
@@ -59,7 +61,7 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
 export async function createSubscription(
   payload: SubscriptionCreatePayload
 ): Promise<Subscription> {
-  const res = await fetch(`${API_BASE_URL}/api/subscriptions`, {
+  const res = await authFetch(`${API_BASE_URL}/api/subscriptions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -104,7 +106,7 @@ export async function createSubscription(
 }
 
 export async function getSubscriptionById(id: number): Promise<Subscription> {
-  const res = await fetch(`${API_BASE_URL}/api/subscriptions/${id}`, {
+  const res = await authFetch(`${API_BASE_URL}/api/subscriptions/${id}`, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
@@ -118,7 +120,7 @@ export async function getSubscriptionById(id: number): Promise<Subscription> {
 }
 
 export async function updateSubscriptionStatus(id: number, payload: SubscriptionStatusPayload): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/subscriptions/${id}/status`, {
+  const res = await authFetch(`${API_BASE_URL}/api/subscriptions/${id}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

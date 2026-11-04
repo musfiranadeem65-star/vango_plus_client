@@ -1,9 +1,11 @@
+import { authFetch } from "@/lib/api/authFetch";
+
 import type { Driver } from "@/types/driver";
 
 const API_BASE_URL = "https://localhost:7270";
 
 export async function getDrivers(): Promise<Driver[]> {
-  const response = await fetch(`${API_BASE_URL}/api/Driver`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Driver`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -19,7 +21,7 @@ export async function getDrivers(): Promise<Driver[]> {
 }
 
 export async function getDriverById(id: number): Promise<Driver> {
-  const response = await fetch(`${API_BASE_URL}/api/drivers/${id}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/drivers/${id}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -43,7 +45,7 @@ export interface DriverPayload {
 }
 
 export async function createDriver(payload: DriverPayload): Promise<Driver> {
-  const response = await fetch(`${API_BASE_URL}/api/Driver`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Driver`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -68,7 +70,7 @@ export async function createDriver(payload: DriverPayload): Promise<Driver> {
 }
 
 export async function updateDriver(id: number, payload: DriverPayload): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/Driver/${id}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Driver/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -91,7 +93,7 @@ export async function updateDriver(id: number, payload: DriverPayload): Promise<
 }
 
 export async function deleteDriver(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/Driver/${id}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Driver/${id}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -104,7 +106,7 @@ export async function deleteDriver(id: number): Promise<void> {
 }
 
 export async function updateDriverStatus(id: number, status: DriverPayload["status"]): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/Driver/${id}/status`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Driver/${id}/status`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
