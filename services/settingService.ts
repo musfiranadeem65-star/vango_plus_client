@@ -1,6 +1,9 @@
 import { authFetch } from "@/lib/api/authFetch";
 
-const API_BASE_URL = "https://localhost:7270";
+// The default is the port `dotnet run` uses locally. Set
+// NEXT_PUBLIC_API_URL in .env.local to point somewhere else.
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "https://localhost:7270";
 
 export interface SchoolSetting {
   id: number;

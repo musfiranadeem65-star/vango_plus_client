@@ -2,7 +2,10 @@ import { authFetch } from "@/lib/api/authFetch";
 
 import type { Driver } from "@/types/driver";
 
-const API_BASE_URL = "https://localhost:7270";
+// The default is the port `dotnet run` uses locally. Set
+// NEXT_PUBLIC_API_URL in .env.local to point somewhere else.
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "https://localhost:7270";
 
 export async function getDrivers(): Promise<Driver[]> {
   const response = await authFetch(`${API_BASE_URL}/api/Driver`, {
@@ -21,7 +24,7 @@ export async function getDrivers(): Promise<Driver[]> {
 }
 
 export async function getDriverById(id: number): Promise<Driver> {
-  const response = await authFetch(`${API_BASE_URL}/api/drivers/${id}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/Driver/${id}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",

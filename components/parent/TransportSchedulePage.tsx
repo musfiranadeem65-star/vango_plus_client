@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Info, Phone, Star } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import { Info, MapPin, Phone, Star } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getDriverById } from "@/services/driverService";
 import { getRouteStops } from "@/services/routeService";
@@ -9,7 +10,20 @@ import { getStudentSchedule, getStudentsByParentId } from "@/services/studentSer
 import { getUserByEmail } from "@/services/userService";
 import type { Driver } from "@/types/driver";
 import type { RouteStop } from "@/types/route";
+import { getMyChildrenTravel } from "@/services/tripRecordService";
 import type { Student } from "@/types/student";
+import type { StudentDayStatus } from "@/types/tripRecord";
+
+// Leaflet reads `window` when it loads, which breaks server rendering, so
+// the map is only ever loaded in the browser.
+const RouteStopsMap = dynamic(() => import("@/components/map/RouteStopsMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[280px] items-center justify-center rounded-2xl bg-surface-container text-sm font-medium text-on-surface-variant">
+      Loading map...
+    </div>
+  ),
+});
 
 interface Stop {
   time: string;
@@ -52,6 +66,8 @@ export default function TransportSchedulePage() {
   const [children, setChildren] = useState<Student[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
+  const [routeStops, setRouteStops] = useState<RouteStop[]>([]);
+  const [travel, setTravel] = useState<StudentDayStatus[]>([]);
   const [routeBadge, setRouteBadge] = useState("");
   const [driver, setDriver] = useState<Driver | null>(null);
   const [loadingChildren, setLoadingChildren] = useState(true);
@@ -88,6 +104,25 @@ export default function TransportSchedulePage() {
   }, [user]);
 
   useEffect(() => {
+    if (!user) return;
+    let active = true;
+
+    async function loadTravel() {
+      try {
+        const rows = await getMyChildrenTravel(7);
+        if (active) setTravel(rows);
+      } catch {
+        // The schedule is still worth showing without this, so a failure
+        // here leaves the pickup line out rather than blanking the page.
+        if (active) setTravel([]);
+      }
+    }
+
+    void loadTravel();
+    return () => { active = false; };
+  }, [user]);
+
+  useEffect(() => {
     if (!selectedId) return;
     const studentId = selectedId;
     let active = true;
@@ -97,6 +132,7 @@ export default function TransportSchedulePage() {
       setLoadingDriver(false);
       setError(null);
       setStops([]);
+      setRouteStops([]);
       setDriver(null);
       try {
         const schedule = await getStudentSchedule(studentId);
@@ -106,6 +142,7 @@ export default function TransportSchedulePage() {
         }
         if (!active) return;
         setStops(mapStops(scheduleStops));
+        setRouteStops(scheduleStops);
         setRouteBadge(schedule.routeName ?? "");
         if (schedule.driverId) {
           setLoadingDriver(true);
@@ -128,6 +165,14 @@ export default function TransportSchedulePage() {
     void loadSchedule();
     return () => { active = false; };
   }, [selectedId]);
+
+  const todayForChild = useMemo(() => {
+    if (!selectedId) return null;
+
+    // The server already sorts newest first, so the first row for this child
+    // is the most recent day anything was recorded.
+    return travel.find((row) => row.studentId === selectedId) ?? null;
+  }, [travel, selectedId]);
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-6">
@@ -166,6 +211,30 @@ export default function TransportSchedulePage() {
             })}
           </div>
 
+          <section className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
+            <h2 className="text-lg font-bold text-foreground">Today&apos;s travel</h2>
+
+            {todayForChild ? (
+              <div className="mt-4 flex flex-wrap gap-6">
+                <TravelFact label="Picked up" at={todayForChild.boardedAt} />
+                <TravelFact label="Dropped off" at={todayForChild.droppedAt} />
+                <div>
+                  <p className="font-[family-name:var(--font-inter)] text-xs font-semibold text-on-surface-variant">
+                    Day
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold text-foreground">
+                    {formatDay(todayForChild.onDate)}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-4 text-sm font-medium text-on-surface-variant">
+                Nothing recorded yet. This fills in once the driver marks your
+                child on and off the van.
+              </p>
+            )}
+          </section>
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
             <section className="rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-card)]">
               <div className="flex items-center justify-between">
@@ -202,6 +271,14 @@ export default function TransportSchedulePage() {
                   })}
                 </ol>
               ) : null}
+
+              <div className="mt-5 border-t border-border pt-5">
+                <p className="flex items-center gap-1.5 text-sm font-bold text-foreground">
+                  <MapPin size={15} className="text-muted" />
+                  Stops on the map
+                </p>
+                <RouteStopsMap stops={routeStops} className="mt-3 h-[300px]" />
+              </div>
             </section>
 
             <aside className="flex flex-col gap-4">
@@ -243,4 +320,38 @@ export default function TransportSchedulePage() {
       ) : null}
     </div>
   );
+}
+
+/** A time the van did something, or a dash when it has not happened yet. */
+function TravelFact({ label, at }: { label: string; at: string | null }) {
+  return (
+    <div>
+      <p className="font-[family-name:var(--font-inter)] text-xs font-semibold text-on-surface-variant">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-semibold text-foreground">
+        {at
+          ? new Date(at).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "Not yet"}
+      </p>
+    </div>
+  );
+}
+
+function formatDay(onDate: string): string {
+  // onDate is a plain yyyy-mm-dd with no zone. Splitting it keeps it that
+  // way: passing it to new Date() would read it as midnight UTC and show the
+  // day before for anyone east of London.
+  const [year, month, day] = onDate.split("-").map(Number);
+
+  if (!year || !month || !day) return onDate;
+
+  return new Date(year, month - 1, day).toLocaleDateString([], {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
 }

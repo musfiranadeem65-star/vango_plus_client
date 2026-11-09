@@ -171,7 +171,17 @@ export function RoutesManagementPage() {
     setDriverName(route.driver || "");
     setRouteStatus(route.status);
     setRouteDescription(route.description ?? "");
-    setStops(route.routeStops ?? []);
+    // The API returns a route's stops without an id, so every stop arrives
+    // with id undefined. updateStop and removeStop match on `stop.id === id`,
+    // and undefined === undefined is true for all of them, so editing one
+    // stop edited every stop and removing one removed the lot. The form only
+    // needs to tell its own rows apart, so it numbers them here.
+    setStops(
+      (route.routeStops ?? []).map((stop, index) => ({
+        ...stop,
+        id: index + 1,
+      }))
+    );
     setErrorMessage("");
     setDrivers([]);
     setDriversError("");
@@ -200,6 +210,11 @@ export function RoutesManagementPage() {
         stopName: stop.stopName.trim(),
         arrivalTime: stop.arrivalTime,
         orderIndex: index + 1,
+
+        // An empty box means "not placed on the map yet", which is null, not
+        // zero. Number("") is 0, and 0,0 is a real place in the Atlantic.
+        latitude: toCoordinate(stop.latitude),
+        longitude: toCoordinate(stop.longitude),
       }));
 
     const payload = {
@@ -304,6 +319,8 @@ export function RoutesManagementPage() {
         stopName: "",
         arrivalTime: "",
         orderIndex: current.length + 1,
+        latitude: null,
+        longitude: null,
       },
     ]);
   }
@@ -332,6 +349,25 @@ export function RoutesManagementPage() {
       current.map((stop) =>
         stop.id === id
           ? { ...stop, [field]: value }
+          : stop
+      )
+    );
+  }
+
+  /**
+   * Latitude and longitude are kept as the raw text while the box is being
+   * typed in, so a half-typed "31." is not thrown away on every keystroke.
+   * They are turned into numbers once, on save.
+   */
+  function updateStopCoordinate(
+    id: number,
+    field: "latitude" | "longitude",
+    value: string
+  ) {
+    setStops((current) =>
+      current.map((stop) =>
+        stop.id === id
+          ? { ...stop, [field]: value === "" ? null : value }
           : stop
       )
     );
@@ -875,6 +911,35 @@ export function RoutesManagementPage() {
                               placeholder="ETA (e.g. 07:15 AM)"
                               className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-500 outline-none transition focus:border-[#0B5394] focus:bg-white"
                             />
+
+                            <div className="flex gap-1.5">
+                              <input
+                                value={stop.latitude ?? ""}
+                                onChange={(event) =>
+                                  updateStopCoordinate(
+                                    stop.id,
+                                    "latitude",
+                                    event.target.value
+                                  )
+                                }
+                                inputMode="decimal"
+                                placeholder="Latitude (31.4697)"
+                                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-500 outline-none transition focus:border-[#0B5394] focus:bg-white"
+                              />
+                              <input
+                                value={stop.longitude ?? ""}
+                                onChange={(event) =>
+                                  updateStopCoordinate(
+                                    stop.id,
+                                    "longitude",
+                                    event.target.value
+                                  )
+                                }
+                                inputMode="decimal"
+                                placeholder="Longitude (74.2728)"
+                                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-500 outline-none transition focus:border-[#0B5394] focus:bg-white"
+                              />
+                            </div>
                           </div>
 
                           <button
@@ -918,4 +983,21 @@ export function RoutesManagementPage() {
       ) : null}
     </div>
   );
+}
+
+/**
+ * A typed coordinate box into a number the API can store.
+ *
+ * Empty, blank or nonsense becomes null, which means "this stop has no place
+ * on the map yet". It must not become 0: that is a real coordinate, off the
+ * coast of Africa, and the map would happily draw the route going there.
+ */
+function toCoordinate(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+
+  const text = String(value).trim();
+  if (!text) return null;
+
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
 }

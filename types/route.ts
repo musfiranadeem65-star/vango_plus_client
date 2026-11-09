@@ -13,4 +13,9 @@ export interface RouteStop {
   stopName: string;
   arrivalTime: string;
   orderIndex: number;
+
+  // Null for a stop recorded before coordinates existed, and for one whose
+  // place on the map has not been set yet. The map simply leaves those out.
+  latitude?: number | null;
+  longitude?: number | null;
 }

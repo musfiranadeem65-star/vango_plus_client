@@ -9,6 +9,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { label: "Students", href: "/admin/students", icon: "group" },
   { label: "Drivers", href: "/admin/drivers", icon: "directions_bus" },
   { label: "Routes", href: "/admin/routes", icon: "alt_route" },
+  { label: "Attendance", href: "/admin/attendance", icon: "how_to_reg" },
   { label: "Guardians", href: "/admin/guardians", icon: "family_restroom" },
   { label: "Subscriptions", href: "/admin/subscriptions", icon: "payments" },
   { label: "Settings", href: "/admin/settings", icon: "settings" },

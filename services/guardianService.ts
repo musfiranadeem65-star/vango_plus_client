@@ -2,7 +2,10 @@ import { authFetch } from "@/lib/api/authFetch";
 
 import type { Guardian, GuardianStatusPayload } from "@/types/guardian";
 
-const API_BASE_URL = "https://localhost:7270";
+// The default is the port `dotnet run` uses locally. Set
+// NEXT_PUBLIC_API_URL in .env.local to point somewhere else.
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "https://localhost:7270";
 
 export interface GuardianPayload {
   userId: number;

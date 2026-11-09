@@ -4,7 +4,10 @@ import type { Student } from "@/types/student";
 import type { Route, RouteStop } from "@/types/route";
 import type { StudentSchedule } from "@/types/schedule";
 
-const API_BASE_URL = "https://localhost:7270";
+// The default is the port `dotnet run` uses locally. Set
+// NEXT_PUBLIC_API_URL in .env.local to point somewhere else.
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "https://localhost:7270";
 
 export async function getStudents(): Promise<Student[]> {
   const response = await authFetch(`${API_BASE_URL}/api/Student`, {
@@ -185,6 +188,12 @@ function normalizeStops(value: unknown): RouteStop[] {
       stopName: stopName || "Stop",
       arrivalTime,
       orderIndex: getNumber(stop, "orderIndex", "OrderIndex", "sequence", "Sequence", "order", "Order") ?? index + 1,
+
+      // Null, not undefined, when the stop has no position: the map tells
+      // the two apart only by checking for a number, and dropping these
+      // here would leave every stop unplaceable.
+      latitude: getNumber(stop, "latitude", "Latitude") ?? null,
+      longitude: getNumber(stop, "longitude", "Longitude") ?? null,
     }];
   });
 }

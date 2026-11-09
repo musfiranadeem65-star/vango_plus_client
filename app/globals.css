@@ -97,3 +97,27 @@ body {
 .material-symbols-outlined.filled {
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
 }
+
+/* Numbered markers for the route map.
+   Leaflet builds its markers as plain DOM outside React, so these cannot be
+   Tailwind classes on a component: the class name is written into the divIcon
+   HTML and has to exist in the stylesheet. */
+.vango-stop-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 9999px;
+  background: #0b5394;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+
+/* Leaflet draws its own panes with z-index up to 700, which would otherwise
+   sit over the app's drawers and modals. */
+.leaflet-container {
+  z-index: 0;
+}
